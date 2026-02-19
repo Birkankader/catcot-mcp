@@ -1,0 +1,1070 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Catcot — Semantic Code Search</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oxanium:wght@400;600;700;800&family=Manrope:wght@400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg-deep:#060a14;
+  --bg-base:#0b1120;
+  --bg-surface:#111b2e;
+  --bg-elevated:#162036;
+  --border-subtle:rgba(148,180,255,.07);
+  --border-hover:rgba(148,180,255,.15);
+  --blue:#3b82f6;
+  --blue-glow:rgba(59,130,246,.25);
+  --emerald:#10b981;
+  --emerald-glow:rgba(16,185,129,.2);
+  --purple:#8b5cf6;
+  --purple-glow:rgba(139,92,246,.2);
+  --amber:#f59e0b;
+  --red:#ef4444;
+  --text-primary:#e2e8f0;
+  --text-secondary:#94a3b8;
+  --text-muted:#475569;
+  --font-display:'Oxanium',ui-monospace,monospace;
+  --font-body:'Manrope',system-ui,sans-serif;
+  --font-mono:'Fira Code','SF Mono',ui-monospace,monospace;
+  --ease-out-expo:cubic-bezier(.16,1,.3,1);
+  --ease-spring:cubic-bezier(.34,1.56,.64,1);
+}
+html{scroll-behavior:smooth;background:var(--bg-deep)}
+body{font-family:var(--font-body);color:var(--text-primary);background:var(--bg-deep);overflow-x:hidden;line-height:1.6;-webkit-font-smoothing:antialiased}
+
+/* Scrollbar */
+::-webkit-scrollbar{width:6px}
+::-webkit-scrollbar-track{background:var(--bg-deep)}
+::-webkit-scrollbar-thumb{background:var(--bg-elevated);border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:var(--blue)}
+
+/* Canvas & Overlays */
+#particles{position:fixed;inset:0;z-index:0;pointer-events:none}
+.noise{position:fixed;inset:0;z-index:1;pointer-events:none;opacity:.035;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+  background-size:128px 128px}
+.gradient-orb{position:fixed;border-radius:50%;filter:blur(100px);pointer-events:none;z-index:0}
+.gradient-orb.orb-1{width:600px;height:600px;top:-200px;right:-150px;background:radial-gradient(circle,rgba(59,130,246,.12),transparent 70%)}
+.gradient-orb.orb-2{width:500px;height:500px;bottom:-100px;left:-100px;background:radial-gradient(circle,rgba(139,92,246,.1),transparent 70%)}
+.gradient-orb.orb-3{width:400px;height:400px;top:50%;left:50%;transform:translate(-50%,-50%);background:radial-gradient(circle,rgba(16,185,129,.06),transparent 70%)}
+
+/* Layout */
+main{position:relative;z-index:2;max-width:1200px;margin:0 auto;padding:0 24px}
+section{padding:80px 0}
+.section-label{font-family:var(--font-mono);font-size:11px;letter-spacing:3px;text-transform:uppercase;color:var(--blue);margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.section-label::before{content:'';width:20px;height:1px;background:var(--blue)}
+.section-title{font-family:var(--font-display);font-size:clamp(28px,4vw,40px);font-weight:700;margin-bottom:16px;line-height:1.2}
+.section-desc{color:var(--text-secondary);max-width:560px;font-size:15px}
+
+/* ===== NAV ===== */
+nav{position:fixed;top:0;left:0;right:0;z-index:100;padding:16px 24px;display:flex;align-items:center;justify-content:center;
+  background:rgba(6,10,20,.7);backdrop-filter:blur(20px);border-bottom:1px solid var(--border-subtle);
+  transition:background .3s}
+nav.scrolled{background:rgba(6,10,20,.92)}
+.nav-inner{max-width:1200px;width:100%;display:flex;align-items:center;justify-content:space-between}
+.nav-brand{display:flex;align-items:center;gap:10px;font-family:var(--font-display);font-weight:700;font-size:18px;color:var(--text-primary);text-decoration:none}
+.nav-logo{width:32px;height:32px;border-radius:8px;background:linear-gradient(135deg,var(--blue),var(--purple));display:flex;align-items:center;justify-content:center;padding:2px}
+.nav-links{display:flex;gap:32px}
+.nav-links a{color:var(--text-secondary);text-decoration:none;font-size:13px;font-weight:500;letter-spacing:.3px;transition:color .2s}
+.nav-links a:hover{color:var(--text-primary)}
+.nav-version{font-family:var(--font-mono);font-size:11px;color:var(--text-muted);background:var(--bg-surface);padding:4px 10px;border-radius:20px;border:1px solid var(--border-subtle)}
+
+/* ===== HERO ===== */
+.hero{padding:160px 0 80px;text-align:center;position:relative}
+.hero-badge{display:inline-flex;align-items:center;gap:8px;background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:100px;padding:6px 16px 6px 8px;margin-bottom:32px;font-size:12px;color:var(--text-secondary)}
+.hero-badge .dot{width:6px;height:6px;border-radius:50%;background:var(--emerald);animation:pulse-dot 2s infinite}
+.hero-badge span{font-family:var(--font-mono);letter-spacing:.5px}
+.hero-logo{width:80px;height:80px;margin:0 auto 24px;animation:float 3s ease-in-out infinite}
+.hero h1{font-family:var(--font-display);font-size:clamp(52px,8vw,88px);font-weight:800;line-height:1;margin-bottom:24px;
+  background:linear-gradient(135deg,#fff 0%,var(--blue) 50%,var(--purple) 100%);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.hero h1 .accent{background:linear-gradient(135deg,var(--emerald),var(--blue));-webkit-background-clip:text;background-clip:text}
+.hero-tagline{font-size:clamp(18px,2.5vw,22px);color:var(--text-secondary);max-width:600px;margin:0 auto 40px;font-weight:400;line-height:1.5}
+.hero-tagline strong{color:var(--text-primary);font-weight:600}
+.hero-actions{display:flex;gap:16px;justify-content:center;flex-wrap:wrap}
+.btn{display:inline-flex;align-items:center;gap:8px;padding:12px 28px;border-radius:12px;font-family:var(--font-body);font-size:14px;font-weight:600;text-decoration:none;transition:all .3s var(--ease-out-expo);cursor:pointer;border:none}
+.btn-primary{background:var(--blue);color:#fff;box-shadow:0 0 20px var(--blue-glow),0 4px 12px rgba(0,0,0,.3)}
+.btn-primary:hover{transform:translateY(-2px);box-shadow:0 0 30px var(--blue-glow),0 8px 24px rgba(0,0,0,.4)}
+.btn-ghost{background:var(--bg-surface);color:var(--text-primary);border:1px solid var(--border-subtle)}
+.btn-ghost:hover{border-color:var(--border-hover);background:var(--bg-elevated)}
+.hero-visual{margin-top:64px;position:relative}
+.hero-terminal{background:var(--bg-base);border:1px solid var(--border-subtle);border-radius:16px;overflow:hidden;max-width:700px;margin:0 auto;text-align:left;box-shadow:0 25px 60px rgba(0,0,0,.5)}
+.terminal-header{display:flex;align-items:center;gap:8px;padding:14px 18px;background:var(--bg-surface);border-bottom:1px solid var(--border-subtle)}
+.terminal-dot{width:12px;height:12px;border-radius:50%}
+.terminal-dot.r{background:#ef4444}.terminal-dot.y{background:#f59e0b}.terminal-dot.g{background:#22c55e}
+.terminal-title{flex:1;text-align:center;font-family:var(--font-mono);font-size:12px;color:var(--text-muted)}
+.terminal-body{padding:20px 24px;font-family:var(--font-mono);font-size:13px;line-height:1.8}
+.terminal-body .prompt{color:var(--emerald)}
+.terminal-body .cmd{color:var(--text-primary)}
+.terminal-body .output{color:var(--text-secondary)}
+.terminal-body .highlight{color:var(--blue)}
+.terminal-body .warn{color:var(--amber)}
+.typing-cursor{display:inline-block;width:8px;height:16px;background:var(--emerald);margin-left:2px;animation:blink 1s step-end infinite;vertical-align:text-bottom}
+
+/* ===== SAVINGS ===== */
+.savings-section{padding:40px 0 80px}
+.savings-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px}
+.savings-card{background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:16px;padding:24px;text-align:center;transition:all .3s var(--ease-out-expo)}
+.savings-card:hover{border-color:var(--border-hover);transform:translateY(-2px)}
+.savings-value{font-family:var(--font-display);font-weight:800;font-size:28px;margin-bottom:4px}
+.savings-value.tokens{color:var(--emerald)}
+.savings-value.dollars{color:var(--blue)}
+.savings-value.searches{color:var(--purple)}
+.savings-value.efficiency{color:var(--amber)}
+.savings-label{font-size:12px;color:var(--text-muted);font-family:var(--font-mono);letter-spacing:.5px}
+.savings-chart{background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:16px;padding:24px}
+.savings-chart-title{font-family:var(--font-display);font-weight:600;font-size:14px;margin-bottom:16px;color:var(--text-secondary)}
+.chart-bars{display:flex;align-items:flex-end;gap:8px;height:120px;padding-top:8px}
+.chart-bar-wrapper{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;height:100%}
+.chart-bar{width:100%;border-radius:6px 6px 0 0;background:linear-gradient(180deg,var(--blue),var(--purple));min-height:4px;transition:height .5s var(--ease-out-expo);margin-top:auto}
+.chart-bar-label{font-family:var(--font-mono);font-size:9px;color:var(--text-muted)}
+
+.embed-viz{background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:16px;padding:24px;position:relative;overflow:hidden;margin-top:32px}
+#embed-canvas{width:100%;height:500px;cursor:crosshair;display:block}
+.embed-tooltip{position:absolute;display:none;background:var(--bg-elevated);border:1px solid var(--border-hover);border-radius:8px;padding:8px 12px;font-family:var(--font-mono);font-size:11px;color:var(--text-primary);pointer-events:none;z-index:10;max-width:300px;line-height:1.5}
+.embed-legend{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+.embed-legend-item{display:flex;align-items:center;gap:6px;font-family:var(--font-mono);font-size:11px;color:var(--text-secondary)}
+.embed-legend-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.embed-empty{text-align:center;padding:60px 24px;color:var(--text-muted);font-family:var(--font-mono);font-size:13px}
+
+/* ===== STATUS ===== */
+.status-section{padding:40px 0 80px}
+.status-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.status-card{background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:16px;padding:24px;display:flex;align-items:center;gap:16px;transition:all .3s var(--ease-out-expo)}
+.status-card:hover{border-color:var(--border-hover);transform:translateY(-2px)}
+.status-icon{width:48px;height:48px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+.status-icon.ollama{background:rgba(59,130,246,.1);color:var(--blue)}
+.status-icon.chroma{background:rgba(139,92,246,.1);color:var(--purple)}
+.status-icon.mcp{background:rgba(16,185,129,.1);color:var(--emerald)}
+.status-info{flex:1;min-width:0}
+.status-name{font-weight:600;font-size:14px;margin-bottom:2px}
+.status-detail{font-family:var(--font-mono);font-size:11px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.status-indicator{width:10px;height:10px;border-radius:50%;flex-shrink:0;position:relative}
+.status-indicator.online{background:var(--emerald);box-shadow:0 0 8px var(--emerald-glow)}
+.status-indicator.online::after{content:'';position:absolute;inset:-3px;border-radius:50%;border:2px solid var(--emerald);opacity:.4;animation:pulse-ring 2s infinite}
+.status-indicator.offline{background:var(--red);box-shadow:0 0 8px rgba(239,68,68,.3)}
+.status-indicator.checking{background:var(--amber);animation:pulse-dot 1s infinite}
+
+/* ===== PROJECTS ===== */
+.projects-header{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:32px;flex-wrap:wrap;gap:16px}
+.projects-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px}
+.project-card{background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:16px;padding:24px;transition:all .3s var(--ease-out-expo);position:relative;overflow:hidden}
+.project-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--blue),var(--purple),var(--emerald));opacity:0;transition:opacity .3s}
+.project-card:hover{border-color:var(--border-hover);transform:translateY(-2px)}
+.project-card:hover::before{opacity:1}
+.project-name{font-family:var(--font-display);font-weight:700;font-size:18px;margin-bottom:4px}
+.project-path{font-family:var(--font-mono);font-size:11px;color:var(--text-muted);margin-bottom:16px;word-break:break-all}
+.project-stats{display:flex;gap:16px;flex-wrap:wrap}
+.project-stat{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-secondary)}
+.project-stat svg{width:14px;height:14px;opacity:.6}
+.project-stat .val{font-family:var(--font-mono);color:var(--text-primary);font-weight:600}
+.empty-state{text-align:center;padding:60px 20px;background:var(--bg-surface);border:1px dashed var(--border-subtle);border-radius:16px}
+.empty-state svg{width:48px;height:48px;color:var(--text-muted);margin-bottom:16px}
+.empty-state h3{font-family:var(--font-display);font-size:18px;margin-bottom:8px;color:var(--text-secondary)}
+.empty-state p{font-size:13px;color:var(--text-muted);max-width:400px;margin:0 auto}
+.empty-state code{font-family:var(--font-mono);background:var(--bg-elevated);padding:2px 8px;border-radius:6px;font-size:12px;color:var(--blue)}
+
+/* ===== FEATURES ===== */
+.features-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-top:40px}
+.feature-card{background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:16px;padding:32px;transition:all .3s var(--ease-out-expo);position:relative}
+.feature-card:hover{border-color:var(--border-hover);transform:translateY(-3px)}
+.feature-card:hover .feature-icon{transform:scale(1.1)}
+.feature-icon{width:48px;height:48px;border-radius:12px;display:flex;align-items:center;justify-content:center;margin-bottom:20px;font-size:22px;transition:transform .3s var(--ease-spring)}
+.feature-card:nth-child(1) .feature-icon{background:rgba(59,130,246,.1);color:var(--blue)}
+.feature-card:nth-child(2) .feature-icon{background:rgba(16,185,129,.1);color:var(--emerald)}
+.feature-card:nth-child(3) .feature-icon{background:rgba(245,158,11,.1);color:var(--amber)}
+.feature-card:nth-child(4) .feature-icon{background:rgba(139,92,246,.1);color:var(--purple)}
+.feature-card:nth-child(5) .feature-icon{background:rgba(239,68,68,.1);color:var(--red)}
+.feature-title{font-family:var(--font-display);font-weight:700;font-size:18px;margin-bottom:8px}
+.feature-desc{color:var(--text-secondary);font-size:14px;line-height:1.6}
+.feature-tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:16px}
+.feature-tag{font-family:var(--font-mono);font-size:10px;padding:4px 10px;border-radius:100px;background:var(--bg-elevated);color:var(--text-muted);border:1px solid var(--border-subtle);letter-spacing:.5px}
+
+/* ===== ARCHITECTURE ===== */
+.arch-section{padding:80px 0}
+.arch-flow{display:flex;align-items:center;gap:0;margin-top:48px;overflow-x:auto;padding:20px 0}
+.arch-node{flex-shrink:0;text-align:center;position:relative}
+.arch-node-box{width:140px;background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:16px;padding:24px 16px;transition:all .3s;position:relative}
+.arch-node-box:hover{border-color:var(--border-hover);transform:translateY(-4px)}
+.arch-node-icon{width:44px;height:44px;border-radius:12px;margin:0 auto 12px;display:flex;align-items:center;justify-content:center;font-size:20px}
+.arch-node:nth-child(1) .arch-node-icon{background:rgba(59,130,246,.1);color:var(--blue)}
+.arch-node:nth-child(3) .arch-node-icon{background:rgba(16,185,129,.1);color:var(--emerald)}
+.arch-node:nth-child(5) .arch-node-icon{background:rgba(245,158,11,.1);color:var(--amber)}
+.arch-node:nth-child(7) .arch-node-icon{background:rgba(139,92,246,.1);color:var(--purple)}
+.arch-node:nth-child(9) .arch-node-icon{background:rgba(59,130,246,.1);color:var(--blue)}
+.arch-node-label{font-family:var(--font-display);font-weight:600;font-size:13px;margin-bottom:4px}
+.arch-node-sub{font-family:var(--font-mono);font-size:10px;color:var(--text-muted)}
+.arch-arrow{flex-shrink:0;width:60px;display:flex;align-items:center;justify-content:center;position:relative}
+.arch-arrow svg{width:40px;height:20px;color:var(--text-muted)}
+.arch-arrow .flow-dot{position:absolute;width:4px;height:4px;border-radius:50%;background:var(--blue);animation:flow-right 2s infinite linear}
+
+/* ===== QUICKSTART ===== */
+.steps{display:grid;gap:24px;margin-top:40px;counter-reset:step}
+.step{display:grid;grid-template-columns:60px 1fr;gap:24px;align-items:start}
+.step-num{width:48px;height:48px;border-radius:14px;background:var(--bg-surface);border:1px solid var(--border-subtle);display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-weight:800;font-size:20px;color:var(--blue);flex-shrink:0}
+.step-content h3{font-family:var(--font-display);font-weight:700;font-size:18px;margin-bottom:8px}
+.step-content p{color:var(--text-secondary);font-size:14px;margin-bottom:16px}
+.code-block{background:var(--bg-base);border:1px solid var(--border-subtle);border-radius:12px;overflow:hidden}
+.code-header{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;background:var(--bg-surface);border-bottom:1px solid var(--border-subtle)}
+.code-lang{font-family:var(--font-mono);font-size:11px;color:var(--text-muted)}
+.code-copy{background:none;border:1px solid var(--border-subtle);color:var(--text-muted);font-family:var(--font-mono);font-size:11px;padding:4px 12px;border-radius:6px;cursor:pointer;transition:all .2s}
+.code-copy:hover{color:var(--text-primary);border-color:var(--border-hover)}
+.code-body{padding:16px 20px;font-family:var(--font-mono);font-size:13px;line-height:1.7;overflow-x:auto;white-space:pre}
+.code-body .kw{color:var(--purple)}
+.code-body .str{color:var(--emerald)}
+.code-body .fn{color:var(--blue)}
+.code-body .cm{color:var(--text-muted)}
+.code-body .op{color:var(--text-secondary)}
+
+/* ===== FOOTER ===== */
+footer{border-top:1px solid var(--border-subtle);padding:40px 0;margin-top:40px}
+.footer-inner{max-width:1200px;margin:0 auto;padding:0 24px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px}
+.footer-left{display:flex;align-items:center;gap:12px}
+.footer-left span{font-family:var(--font-display);font-weight:600;font-size:14px}
+
+.footer-right{font-family:var(--font-mono);font-size:11px;color:var(--text-muted)}
+
+/* ===== ANIMATIONS ===== */
+@keyframes pulse-dot{0%,100%{opacity:1}50%{opacity:.4}}
+@keyframes pulse-ring{0%{transform:scale(1);opacity:.4}100%{transform:scale(2.2);opacity:0}}
+@keyframes blink{50%{opacity:0}}
+@keyframes flow-right{0%{left:0;opacity:0}20%{opacity:1}80%{opacity:1}100%{left:calc(100% - 4px);opacity:0}}
+@keyframes fade-up{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:translateY(0)}}
+@keyframes glow-pulse{0%,100%{box-shadow:0 0 20px var(--blue-glow)}50%{box-shadow:0 0 40px var(--blue-glow)}}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+
+.reveal{opacity:0;transform:translateY(30px);transition:all .8s var(--ease-out-expo)}
+.reveal.visible{opacity:1;transform:translateY(0)}
+.reveal-delay-1{transition-delay:.1s}
+.reveal-delay-2{transition-delay:.2s}
+.reveal-delay-3{transition-delay:.3s}
+.reveal-delay-4{transition-delay:.4s}
+
+/* Responsive */
+@media(max-width:768px){
+  .status-grid{grid-template-columns:1fr}
+  .features-grid{grid-template-columns:1fr}
+  .savings-grid{grid-template-columns:repeat(2,1fr)}
+  .arch-flow{flex-direction:column}
+  .arch-arrow{transform:rotate(90deg);width:auto;height:40px}
+  .step{grid-template-columns:1fr}
+  .step-num{margin-bottom:-8px}
+  .nav-links{display:none}
+  .projects-grid{grid-template-columns:1fr}
+  .hero h1{font-size:48px}
+}
+@media(max-width:480px){
+  .hero{padding:120px 0 60px}
+  section{padding:60px 0}
+  .hero h1{font-size:36px}
+  .savings-grid{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<canvas id="particles"></canvas>
+<div class="noise"></div>
+<div class="gradient-orb orb-1"></div>
+<div class="gradient-orb orb-2"></div>
+<div class="gradient-orb orb-3"></div>
+
+<!-- Cat SVG Logo (reusable) -->
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none">
+  <defs>
+    <linearGradient id="catGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#3b82f6"/>
+      <stop offset="100%" style="stop-color:#8b5cf6"/>
+    </linearGradient>
+  </defs>
+  <symbol id="catcot-logo" viewBox="0 0 64 64">
+    <!-- Cat face -->
+    <path d="M12 20 L8 6 L20 16 Z" fill="url(#catGrad)" opacity="0.9"/><!-- Left ear -->
+    <path d="M52 20 L56 6 L44 16 Z" fill="url(#catGrad)" opacity="0.9"/><!-- Right ear -->
+    <circle cx="32" cy="34" r="22" fill="url(#catGrad)" opacity="0.15"/><!-- Head bg -->
+    <circle cx="32" cy="34" r="22" fill="none" stroke="url(#catGrad)" stroke-width="2"/><!-- Head outline -->
+    <!-- Eyes -->
+    <ellipse cx="24" cy="30" rx="3.5" ry="4" fill="#3b82f6"/>
+    <ellipse cx="40" cy="30" rx="3.5" ry="4" fill="#8b5cf6"/>
+    <ellipse cx="24" cy="29" rx="1.5" ry="2" fill="#fff" opacity="0.8"/>
+    <ellipse cx="40" cy="29" rx="1.5" ry="2" fill="#fff" opacity="0.8"/>
+    <!-- Nose -->
+    <path d="M30 37 L32 39 L34 37 Z" fill="#8b5cf6" opacity="0.7"/>
+    <!-- Mouth -->
+    <path d="M32 39 Q28 43 25 41" fill="none" stroke="#8b5cf6" stroke-width="1.2" opacity="0.5"/>
+    <path d="M32 39 Q36 43 39 41" fill="none" stroke="#3b82f6" stroke-width="1.2" opacity="0.5"/>
+    <!-- Whiskers -->
+    <line x1="4" y1="32" x2="20" y2="35" stroke="#3b82f6" stroke-width="1" opacity="0.4"/>
+    <line x1="4" y1="38" x2="20" y2="38" stroke="#3b82f6" stroke-width="1" opacity="0.3"/>
+    <line x1="60" y1="32" x2="44" y2="35" stroke="#8b5cf6" stroke-width="1" opacity="0.4"/>
+    <line x1="60" y1="38" x2="44" y2="38" stroke="#8b5cf6" stroke-width="1" opacity="0.3"/>
+    <!-- Code brackets on forehead -->
+    <text x="25" y="24" font-family="monospace" font-size="10" fill="#fff" opacity="0.6">&lt;/&gt;</text>
+  </symbol>
+</svg>
+
+<!-- NAV -->
+<nav id="nav">
+  <div class="nav-inner">
+    <a href="#" class="nav-brand">
+      <div class="nav-logo">
+        <svg width="28" height="28"><use href="#catcot-logo"/></svg>
+      </div>
+      Catcot
+    </a>
+    <div class="nav-links">
+      <a href="#savings">Savings</a>
+      <a href="#status">Status</a>
+      <a href="#projects">Projects</a>
+      <a href="#embeddings">Code Map</a>
+      <a href="#features">Features</a>
+      <a href="#quickstart">Quick Start</a>
+    </div>
+    <div class="nav-version">v2.0.0</div>
+  </div>
+</nav>
+
+<main>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-badge">
+    <div class="dot"></div>
+    <span>MCP Server &middot; Local &middot; Private</span>
+  </div>
+  <div class="hero-logo">
+    <svg width="80" height="80"><use href="#catcot-logo"/></svg>
+  </div>
+  <h1>Catcot</h1>
+  <p class="hero-tagline">
+    <strong>Semantic code search</strong> for Claude Code.<br>
+    Index your codebase, search with natural language — all local, zero cloud.
+  </p>
+  <div class="hero-actions">
+    <a href="#quickstart" class="btn btn-primary">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+      Get Started
+    </a>
+    <a href="#features" class="btn btn-ghost">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+      Learn More
+    </a>
+  </div>
+  <div class="hero-visual">
+    <div class="hero-terminal">
+      <div class="terminal-header">
+        <div class="terminal-dot r"></div>
+        <div class="terminal-dot y"></div>
+        <div class="terminal-dot g"></div>
+        <div class="terminal-title">claude — catcot</div>
+      </div>
+      <div class="terminal-body" id="terminal-body"></div>
+    </div>
+  </div>
+</section>
+
+<!-- SAVINGS -->
+<section class="savings-section" id="savings">
+  <div class="section-label reveal">Token Savings</div>
+  <h2 class="section-title reveal reveal-delay-1">Your Catcot Savings</h2>
+  <p class="section-desc reveal reveal-delay-2">See how much Catcot saves by returning only relevant code chunks instead of entire files.</p>
+  <div class="savings-grid" style="margin-top:24px">
+    <div class="savings-card reveal reveal-delay-1">
+      <div class="savings-value searches" id="savings-searches">0</div>
+      <div class="savings-label">Total Searches</div>
+    </div>
+    <div class="savings-card reveal reveal-delay-2">
+      <div class="savings-value tokens" id="savings-tokens">0</div>
+      <div class="savings-label">Tokens Saved</div>
+    </div>
+    <div class="savings-card reveal reveal-delay-3">
+      <div class="savings-value dollars" id="savings-dollars">$0.00</div>
+      <div class="savings-label">Estimated Savings</div>
+    </div>
+    <div class="savings-card reveal reveal-delay-4">
+      <div class="savings-value efficiency" id="savings-efficiency">0%</div>
+      <div class="savings-label">Efficiency</div>
+    </div>
+  </div>
+  <div class="savings-chart reveal" id="savings-chart">
+    <div class="savings-chart-title">Last 7 Days — Tokens Saved</div>
+    <div class="chart-bars" id="chart-bars"></div>
+  </div>
+</section>
+
+<!-- EMBEDDING SPACE -->
+<section id="embeddings">
+  <div class="section-label reveal">Code Map</div>
+  <h2 class="section-title reveal reveal-delay-1">Embedding Space</h2>
+  <p class="section-desc reveal reveal-delay-2">Visualize which code chunks are semantically similar. Each dot is a code chunk — proximity means semantic similarity.</p>
+  <div class="embed-viz reveal">
+    <canvas id="embed-canvas" width="800" height="500"></canvas>
+    <div id="embed-tooltip" class="embed-tooltip"></div>
+    <div class="embed-legend" id="embed-legend"></div>
+  </div>
+</section>
+
+<!-- STATUS -->
+<section class="status-section" id="status">
+  <div class="section-label reveal">System Status</div>
+  <div class="status-grid">
+    <div class="status-card reveal reveal-delay-1">
+      <div class="status-icon ollama">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+      </div>
+      <div class="status-info">
+        <div class="status-name">Ollama</div>
+        <div class="status-detail" id="ollama-detail">Checking...</div>
+      </div>
+      <div class="status-indicator checking" id="ollama-status"></div>
+    </div>
+    <div class="status-card reveal reveal-delay-2">
+      <div class="status-icon chroma">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 002 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0022 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+      </div>
+      <div class="status-info">
+        <div class="status-name">ChromaDB</div>
+        <div class="status-detail" id="chroma-detail">Checking...</div>
+      </div>
+      <div class="status-indicator checking" id="chroma-status"></div>
+    </div>
+    <div class="status-card reveal reveal-delay-3">
+      <div class="status-icon mcp">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      </div>
+      <div class="status-info">
+        <div class="status-name">MCP Server</div>
+        <div class="status-detail" id="mcp-detail">Checking...</div>
+      </div>
+      <div class="status-indicator checking" id="mcp-status"></div>
+    </div>
+  </div>
+</section>
+
+<!-- PROJECTS -->
+<section id="projects">
+  <div class="projects-header">
+    <div>
+      <div class="section-label reveal">Indexed Projects</div>
+      <h2 class="section-title reveal reveal-delay-1">Your Codebase Index</h2>
+      <p class="section-desc reveal reveal-delay-2">Projects indexed for semantic search. Claude can query these instantly via Catcot.</p>
+    </div>
+  </div>
+  <div id="projects-container"></div>
+</section>
+
+<!-- FEATURES -->
+<section id="features">
+  <div class="section-label reveal">Capabilities</div>
+  <h2 class="section-title reveal reveal-delay-1">Built for Developer Workflows</h2>
+  <p class="section-desc reveal reveal-delay-2">Everything runs locally. Your code never leaves your machine.</p>
+  <div class="features-grid">
+    <div class="feature-card reveal reveal-delay-1">
+      <div class="feature-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+      </div>
+      <div class="feature-title">Smart Chunking</div>
+      <div class="feature-desc">Language-aware code splitting that understands classes, functions, and logical boundaries. Not just line counts.</div>
+      <div class="feature-tags">
+        <span class="feature-tag">Python</span>
+        <span class="feature-tag">Kotlin</span>
+        <span class="feature-tag">Java</span>
+        <span class="feature-tag">JS / TS</span>
+        <span class="feature-tag">SQL</span>
+      </div>
+    </div>
+    <div class="feature-card reveal reveal-delay-2">
+      <div class="feature-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      </div>
+      <div class="feature-title">Vector Search</div>
+      <div class="feature-desc">Cosine similarity search using nomic-embed-text embeddings. Find semantically related code, not just string matches.</div>
+      <div class="feature-tags">
+        <span class="feature-tag">768-dim vectors</span>
+        <span class="feature-tag">cosine similarity</span>
+        <span class="feature-tag">nomic-embed-text</span>
+      </div>
+    </div>
+    <div class="feature-card reveal reveal-delay-3">
+      <div class="feature-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
+      </div>
+      <div class="feature-title">Incremental Indexing</div>
+      <div class="feature-desc">Content-hash based change detection. Only re-indexes files that actually changed. Fast subsequent runs.</div>
+      <div class="feature-tags">
+        <span class="feature-tag">SHA-256 hash</span>
+        <span class="feature-tag">skip unchanged</span>
+        <span class="feature-tag">delta updates</span>
+      </div>
+    </div>
+    <div class="feature-card reveal reveal-delay-4">
+      <div class="feature-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      </div>
+      <div class="feature-title">MCP Native</div>
+      <div class="feature-desc">Built as a Model Context Protocol server. Claude Code discovers and uses your indexed code as context automatically.</div>
+      <div class="feature-tags">
+        <span class="feature-tag">stdio transport</span>
+        <span class="feature-tag">FastMCP</span>
+        <span class="feature-tag">5 tools</span>
+      </div>
+    </div>
+    <div class="feature-card reveal reveal-delay-1">
+      <div class="feature-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+      </div>
+      <div class="feature-title">Code Review</div>
+      <div class="feature-desc">AI-powered code review using Catcot context + Gemini CLI. Get contextual review with related code snippets from your project.</div>
+      <div class="feature-tags">
+        <span class="feature-tag">Gemini CLI</span>
+        <span class="feature-tag">context-aware</span>
+        <span class="feature-tag">code_review tool</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ARCHITECTURE -->
+<section class="arch-section" id="architecture">
+  <div class="section-label reveal">How It Works</div>
+  <h2 class="section-title reveal reveal-delay-1">Architecture</h2>
+  <p class="section-desc reveal reveal-delay-2">From source files to semantic search in five steps.</p>
+  <div class="arch-flow reveal reveal-delay-3">
+    <div class="arch-node">
+      <div class="arch-node-box">
+        <div class="arch-node-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
+        </div>
+        <div class="arch-node-label">Source Files</div>
+        <div class="arch-node-sub">.py .kt .java .ts</div>
+      </div>
+    </div>
+    <div class="arch-arrow"><svg viewBox="0 0 40 20"><path d="M0 10 L30 10 M25 5 L32 10 L25 15" stroke="currentColor" stroke-width="1.5" fill="none"/></svg><div class="flow-dot"></div></div>
+    <div class="arch-node">
+      <div class="arch-node-box">
+        <div class="arch-node-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
+        </div>
+        <div class="arch-node-label">Chunkers</div>
+        <div class="arch-node-sub">AST-aware split</div>
+      </div>
+    </div>
+    <div class="arch-arrow"><svg viewBox="0 0 40 20"><path d="M0 10 L30 10 M25 5 L32 10 L25 15" stroke="currentColor" stroke-width="1.5" fill="none"/></svg><div class="flow-dot"></div></div>
+    <div class="arch-node">
+      <div class="arch-node-box">
+        <div class="arch-node-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+        </div>
+        <div class="arch-node-label">Ollama</div>
+        <div class="arch-node-sub">nomic-embed-text</div>
+      </div>
+    </div>
+    <div class="arch-arrow"><svg viewBox="0 0 40 20"><path d="M0 10 L30 10 M25 5 L32 10 L25 15" stroke="currentColor" stroke-width="1.5" fill="none"/></svg><div class="flow-dot"></div></div>
+    <div class="arch-node">
+      <div class="arch-node-box">
+        <div class="arch-node-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 002 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0022 16z"/></svg>
+        </div>
+        <div class="arch-node-label">ChromaDB</div>
+        <div class="arch-node-sub">vector store</div>
+      </div>
+    </div>
+    <div class="arch-arrow"><svg viewBox="0 0 40 20"><path d="M0 10 L30 10 M25 5 L32 10 L25 15" stroke="currentColor" stroke-width="1.5" fill="none"/></svg><div class="flow-dot"></div></div>
+    <div class="arch-node">
+      <div class="arch-node-box">
+        <div class="arch-node-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+        </div>
+        <div class="arch-node-label">Claude Code</div>
+        <div class="arch-node-sub">Catcot MCP</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- QUICKSTART -->
+<section id="quickstart">
+  <div class="section-label reveal">Get Started</div>
+  <h2 class="section-title reveal reveal-delay-1">Three Steps to Semantic Search</h2>
+  <p class="section-desc reveal reveal-delay-2">Set up once, use everywhere.</p>
+  <div class="steps">
+    <div class="step reveal reveal-delay-1">
+      <div class="step-num">1</div>
+      <div class="step-content">
+        <h3>Configure MCP Server</h3>
+        <p>Add Catcot to your Claude Code settings. It registers as an MCP server automatically.</p>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">terminal</span>
+            <button class="code-copy" onclick="copyCode(this)">copy</button>
+          </div>
+          <div class="code-body"><span class="prompt">$</span> claude mcp add -s user catcot -- \
+    python ~/code-rag-mcp/server.py</div>
+        </div>
+      </div>
+    </div>
+    <div class="step reveal reveal-delay-2">
+      <div class="step-num">2</div>
+      <div class="step-content">
+        <h3>Index Your Project</h3>
+        <p>Tell Claude to index your codebase. Catcot will chunk, embed, and store everything locally.</p>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">claude prompt</span>
+            <button class="code-copy" onclick="copyCode(this)">copy</button>
+          </div>
+          <div class="code-body"><span class="cm">// In Claude Code, just say:</span>
+<span class="str">"Index my project at ~/my-app for code search"</span>
+
+<span class="cm">// Claude calls → index_project(path="~/my-app")</span>
+<span class="cm">// Output:</span>
+<span class="op">{</span>
+  <span class="kw">"files_scanned"</span>: <span class="fn">142</span>,
+  <span class="kw">"files_indexed"</span>: <span class="fn">138</span>,
+  <span class="kw">"chunks_created"</span>: <span class="fn">847</span>
+<span class="op">}</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="step reveal reveal-delay-3">
+      <div class="step-num">3</div>
+      <div class="step-content">
+        <h3>Search Naturally</h3>
+        <p>Ask Claude anything about your code. Catcot uses vector search to find the most relevant snippets.</p>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">claude prompt</span>
+            <button class="code-copy" onclick="copyCode(this)">copy</button>
+          </div>
+          <div class="code-body"><span class="str">"Search for authentication middleware logic"</span>
+
+<span class="cm">// Claude calls → search_code(query="authentication middleware")</span>
+<span class="cm">// [Catcot] Found 5 results (saved ~12,500 tokens, ~$0.0375)</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-inner">
+    <div class="footer-left">
+      <svg width="24" height="24"><use href="#catcot-logo"/></svg>
+      <span>Catcot</span>
+    </div>
+    <div class="footer-right">Local MCP Server &middot; Ollama + ChromaDB &middot; MIT License</div>
+  </div>
+</footer>
+
+<script>
+// ===== PARTICLE SYSTEM =====
+(function(){
+  const canvas=document.getElementById('particles');
+  const ctx=canvas.getContext('2d');
+  let W,H,particles=[];
+  const COLORS=['rgba(59,130,246,','rgba(16,185,129,','rgba(139,92,246,'];
+  const COUNT=70;
+  const CONNECT_DIST=120;
+
+  function resize(){W=canvas.width=window.innerWidth;H=canvas.height=window.innerHeight}
+  window.addEventListener('resize',resize);resize();
+
+  class Particle{
+    constructor(){this.reset()}
+    reset(){
+      this.x=Math.random()*W;this.y=Math.random()*H;
+      this.vx=(Math.random()-.5)*.3;this.vy=(Math.random()-.5)*.3;
+      this.r=Math.random()*1.5+.5;
+      this.color=COLORS[Math.floor(Math.random()*COLORS.length)];
+      this.alpha=Math.random()*.4+.1;
+    }
+    update(){
+      this.x+=this.vx;this.y+=this.vy;
+      if(this.x<0||this.x>W)this.vx*=-1;
+      if(this.y<0||this.y>H)this.vy*=-1;
+    }
+    draw(){
+      ctx.beginPath();ctx.arc(this.x,this.y,this.r,0,Math.PI*2);
+      ctx.fillStyle=this.color+this.alpha+')';ctx.fill();
+    }
+  }
+
+  for(let i=0;i<COUNT;i++)particles.push(new Particle());
+
+  function animate(){
+    ctx.clearRect(0,0,W,H);
+    for(let i=0;i<particles.length;i++){
+      particles[i].update();particles[i].draw();
+      for(let j=i+1;j<particles.length;j++){
+        const dx=particles[i].x-particles[j].x;
+        const dy=particles[i].y-particles[j].y;
+        const dist=Math.sqrt(dx*dx+dy*dy);
+        if(dist<CONNECT_DIST){
+          const alpha=(.15*(1-dist/CONNECT_DIST));
+          ctx.beginPath();ctx.moveTo(particles[i].x,particles[i].y);
+          ctx.lineTo(particles[j].x,particles[j].y);
+          ctx.strokeStyle='rgba(59,130,246,'+alpha+')';ctx.lineWidth=.5;ctx.stroke();
+        }
+      }
+    }
+    requestAnimationFrame(animate);
+  }
+  animate();
+})();
+
+// ===== NAV SCROLL =====
+window.addEventListener('scroll',()=>{
+  document.getElementById('nav').classList.toggle('scrolled',window.scrollY>50);
+});
+
+// ===== TERMINAL TYPING =====
+(function(){
+  const lines=[
+    {type:'prompt',text:'$ '},
+    {type:'cmd',text:'claude "Search for authentication logic in my project"',speed:30},
+    {type:'pause',ms:600},
+    {type:'output',text:'\n'},
+    {type:'highlight',text:'  ◆ Catcot: Calling search_code(query="authentication logic")\n'},
+    {type:'pause',ms:400},
+    {type:'output',text:'\n  [Catcot] Found 5 results (saved ~12,500 tokens, ~$0.0375)'},
+    {type:'output',text:'\n  ### src/auth/middleware.py:15-42 (AuthMiddleware)'},
+    {type:'output',text:'\n  [similarity: 0.9247]\n'},
+    {type:'warn',text:'  ✓ Found 5 relevant code chunks across 3 files\n'},
+  ];
+  const container=document.getElementById('terminal-body');
+  let lineIdx=0,charIdx=0;
+
+  function type(){
+    if(lineIdx>=lines.length){
+      const cursor=document.createElement('span');
+      cursor.className='typing-cursor';container.appendChild(cursor);
+      setTimeout(()=>{container.innerHTML='';lineIdx=0;charIdx=0;type()},4000);
+      return;
+    }
+    const line=lines[lineIdx];
+    if(line.type==='pause'){
+      lineIdx++;charIdx=0;setTimeout(type,line.ms);return;
+    }
+    const span=document.createElement('span');
+    span.className=line.type;
+    container.appendChild(span);
+    const speed=line.speed||15;
+    function typeChar(){
+      if(charIdx<line.text.length){
+        span.textContent+=line.text[charIdx];charIdx++;
+        setTimeout(typeChar,line.type==='cmd'?speed:8);
+      }else{lineIdx++;charIdx=0;setTimeout(type,50)}
+    }
+    typeChar();
+  }
+  setTimeout(type,1200);
+})();
+
+// ===== STATUS POLLING =====
+const API_BASE=window.location.origin;
+
+async function checkStatus(){
+  try{
+    const r=await fetch('http://localhost:11434/api/version',{signal:AbortSignal.timeout(3000)});
+    if(r.ok){
+      const d=await r.json();
+      setStatus('ollama','online','v'+(d.version||'connected'));
+    }else{setStatus('ollama','offline','Not responding')}
+  }catch(e){setStatus('ollama','offline','Not running')}
+
+  try{
+    const r=await fetch(API_BASE+'/api/status',{signal:AbortSignal.timeout(3000)});
+    if(r.ok){
+      const d=await r.json();
+      setStatus('chroma',d.chromadb?'online':'offline',d.chromadb?d.chroma_detail||'Connected':'Not available');
+      setStatus('mcp','online',d.mcp_detail||'Catcot running on stdio');
+    }else{
+      setStatus('chroma','offline','API unreachable');
+      setStatus('mcp','online','Dashboard active');
+    }
+  }catch(e){
+    setStatus('chroma','checking','Checking...');
+    setStatus('mcp','online','Dashboard active');
+  }
+}
+
+function setStatus(name,state,detail){
+  const ind=document.getElementById(name+'-status');
+  const det=document.getElementById(name+'-detail');
+  if(ind){ind.className='status-indicator '+state}
+  if(det){det.textContent=detail}
+}
+
+checkStatus();
+setInterval(checkStatus,8000);
+
+// ===== SAVINGS =====
+function formatNumber(n){
+  if(n>=1000000) return (n/1000000).toFixed(1)+'M';
+  if(n>=1000) return (n/1000).toFixed(1)+'K';
+  return n.toString();
+}
+
+async function loadSavings(){
+  try{
+    const r=await fetch(API_BASE+'/api/savings',{signal:AbortSignal.timeout(3000)});
+    if(!r.ok) return;
+    const d=await r.json();
+
+    document.getElementById('savings-searches').textContent=formatNumber(d.total_searches||0);
+    document.getElementById('savings-tokens').textContent=formatNumber(d.tokens_saved||0);
+    document.getElementById('savings-dollars').textContent='$'+(d.dollars_saved||0).toFixed(2);
+
+    const totalTokens=(d.tokens_saved||0)+(d.tokens_used||0);
+    const efficiency=totalTokens>0?Math.round((d.tokens_saved/totalTokens)*100):0;
+    document.getElementById('savings-efficiency').textContent=efficiency+'%';
+
+    // Render chart
+    const chartEl=document.getElementById('chart-bars');
+    chartEl.innerHTML='';
+    const trend=d.trend||[];
+    const maxVal=Math.max(...trend.map(t=>t.tokens_saved),1);
+
+    trend.forEach(t=>{
+      const wrapper=document.createElement('div');
+      wrapper.className='chart-bar-wrapper';
+      const bar=document.createElement('div');
+      bar.className='chart-bar';
+      const pct=Math.max((t.tokens_saved/maxVal)*100,3);
+      bar.style.height=pct+'%';
+      const label=document.createElement('div');
+      label.className='chart-bar-label';
+      const day=t.date.split('-').slice(1).join('/');
+      label.textContent=day;
+      wrapper.appendChild(bar);
+      wrapper.appendChild(label);
+      chartEl.appendChild(wrapper);
+    });
+  }catch(e){}
+}
+
+loadSavings();
+setInterval(loadSavings,10000);
+
+// ===== PROJECTS =====
+async function loadProjects(){
+  const container=document.getElementById('projects-container');
+  try{
+    const r=await fetch(API_BASE+'/api/projects',{signal:AbortSignal.timeout(3000)});
+    if(r.ok){
+      const projects=await r.json();
+      if(projects.length===0){renderEmpty(container);return}
+      renderProjects(container,projects);
+    }else{renderEmpty(container)}
+  }catch(e){renderEmpty(container)}
+}
+
+function renderProjects(container,projects){
+  container.innerHTML='';
+  const grid=document.createElement('div');grid.className='projects-grid';
+  projects.forEach(p=>{
+    const name=p.project_path?p.project_path.split('/').pop():p.name;
+    const card=document.createElement('div');card.className='project-card reveal visible';
+    card.innerHTML=`
+      <div class="project-name">${escHtml(name)}</div>
+      <div class="project-path">${escHtml(p.project_path||'')}</div>
+      <div class="project-stats">
+        <div class="project-stat">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 002 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0022 16z"/></svg>
+          <span class="val">${p.chunks||0}</span> chunks
+        </div>
+      </div>`;
+    grid.appendChild(card);
+  });
+  container.appendChild(grid);
+}
+
+function renderEmpty(container){
+  container.innerHTML=`
+    <div class="empty-state">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M13 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V9z"/><polyline points="13 2 13 9 20 9"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="12" y1="10" x2="12" y2="16"/></svg>
+      <h3>No projects indexed yet</h3>
+      <p>Tell Claude to index a project:<br><code>"Index my project at ~/my-app"</code></p>
+    </div>`;
+}
+
+function escHtml(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+
+loadProjects();
+setInterval(loadProjects,15000);
+
+// ===== EMBEDDING VISUALIZATION =====
+const EMBED_COLORS = [
+  '#3b82f6','#10b981','#8b5cf6','#f59e0b','#ef4444',
+  '#06b6d4','#ec4899','#84cc16','#f97316','#a78bfa'
+];
+let embedPoints = [];
+let embedMeta = [];
+
+async function loadEmbeddings() {
+  try {
+    const r = await fetch(API_BASE + '/api/embeddings', {signal: AbortSignal.timeout(5000)});
+    if (!r.ok) return;
+    const points = await r.json();
+    if (!points || points.length === 0) {
+      showEmbedEmpty();
+      return;
+    }
+    renderEmbeddings(points);
+  } catch(e) {
+    showEmbedEmpty();
+  }
+}
+
+function showEmbedEmpty() {
+  const canvas = document.getElementById('embed-canvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = 'rgba(148,180,255,0.15)';
+  ctx.font = '13px var(--font-mono, monospace)';
+  ctx.textAlign = 'center';
+  ctx.fillText('No embeddings found — index a project first.', canvas.width / 2, canvas.height / 2);
+}
+
+function renderEmbeddings(points) {
+  const canvas = document.getElementById('embed-canvas');
+  const legend = document.getElementById('embed-legend');
+  const tooltip = document.getElementById('embed-tooltip');
+  if (!canvas) return;
+
+  // Assign colors by language
+  const languages = [...new Set(points.map(p => p.language || 'unknown'))];
+  const langColor = {};
+  languages.forEach((lang, i) => { langColor[lang] = EMBED_COLORS[i % EMBED_COLORS.length]; });
+
+  // Compute canvas logical size
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  const W = canvas.width, H = canvas.height;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  const logW = W / dpr, logH = H / dpr;
+
+  // Compute 2D bounds with padding
+  const pad = 40;
+  const xs = points.map(p => p.x);
+  const ys = points.map(p => p.y);
+  const minX = Math.min(...xs), maxX = Math.max(...xs);
+  const minY = Math.min(...ys), maxY = Math.max(...ys);
+  const rangeX = maxX - minX || 1, rangeY = maxY - minY || 1;
+
+  function toCanvas(x, y) {
+    return [
+      pad + ((x - minX) / rangeX) * (logW - 2 * pad),
+      pad + ((y - minY) / rangeY) * (logH - 2 * pad)
+    ];
+  }
+
+  // Store screen positions for hover
+  const screenPts = points.map(p => {
+    const [sx, sy] = toCanvas(p.x, p.y);
+    return { sx, sy, ...p };
+  });
+
+  function draw() {
+    ctx.clearRect(0, 0, logW, logH);
+    // Subtle grid
+    ctx.strokeStyle = 'rgba(148,180,255,0.05)';
+    ctx.lineWidth = 1;
+    for (let gx = pad; gx <= logW - pad; gx += (logW - 2*pad) / 6) {
+      ctx.beginPath(); ctx.moveTo(gx, pad); ctx.lineTo(gx, logH - pad); ctx.stroke();
+    }
+    for (let gy = pad; gy <= logH - pad; gy += (logH - 2*pad) / 4) {
+      ctx.beginPath(); ctx.moveTo(pad, gy); ctx.lineTo(logW - pad, gy); ctx.stroke();
+    }
+    // Points
+    screenPts.forEach(pt => {
+      const color = langColor[pt.language || 'unknown'];
+      ctx.beginPath();
+      ctx.arc(pt.sx, pt.sy, 5, 0, Math.PI * 2);
+      ctx.fillStyle = color + 'cc';
+      ctx.fill();
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    });
+  }
+  draw();
+
+  // Legend
+  if (legend) {
+    legend.innerHTML = '';
+    languages.forEach(lang => {
+      const item = document.createElement('div');
+      item.className = 'embed-legend-item';
+      item.innerHTML = `<span class="embed-legend-dot" style="background:${langColor[lang]}"></span>${escHtml(lang)}`;
+      legend.appendChild(item);
+    });
+  }
+
+  // Hover tooltip
+  if (tooltip) {
+    canvas.addEventListener('mousemove', (e) => {
+      const canvasRect = canvas.getBoundingClientRect();
+      const mx = e.clientX - canvasRect.left;
+      const my = e.clientY - canvasRect.top;
+      const R = 8;
+      const hit = screenPts.find(pt => Math.hypot(pt.sx - mx, pt.sy - my) < R);
+      if (hit) {
+        const fname = hit.file_path ? hit.file_path.split('/').pop() : '';
+        tooltip.innerHTML =
+          `<strong>${escHtml(fname)}</strong><br>` +
+          (hit.symbol_name ? `${escHtml(hit.symbol_name)}<br>` : '') +
+          `<span style="color:var(--text-muted)">${escHtml(hit.language || '')}</span>`;
+        // Position tooltip avoiding edges
+        let tx = e.clientX - canvasRect.left + 12;
+        let ty = e.clientY - canvasRect.top - 12;
+        if (tx + 220 > logW) tx = mx - 220;
+        if (ty < 0) ty = my + 12;
+        tooltip.style.left = tx + 'px';
+        tooltip.style.top = ty + 'px';
+        tooltip.style.display = 'block';
+      } else {
+        tooltip.style.display = 'none';
+      }
+    });
+    canvas.addEventListener('mouseleave', () => { tooltip.style.display = 'none'; });
+  }
+
+  // Redraw on resize
+  window.addEventListener('resize', () => {
+    const newRect = canvas.getBoundingClientRect();
+    canvas.width = newRect.width * dpr;
+    canvas.height = newRect.height * dpr;
+    ctx.scale(dpr, dpr);
+    draw();
+  });
+}
+
+loadEmbeddings();
+
+// ===== SCROLL REVEAL =====
+const observer=new IntersectionObserver((entries)=>{
+  entries.forEach(e=>{if(e.isIntersecting){e.target.classList.add('visible')}});
+},{threshold:.1,rootMargin:'0px 0px -40px 0px'});
+document.querySelectorAll('.reveal').forEach(el=>observer.observe(el));
+
+// ===== COPY CODE =====
+function copyCode(btn){
+  const block=btn.closest('.code-block').querySelector('.code-body');
+  navigator.clipboard.writeText(block.textContent.trim()).then(()=>{
+    btn.textContent='copied!';setTimeout(()=>btn.textContent='copy',2000);
+  });
+}
+</script>
+</body>
+</html>
