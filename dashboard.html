@@ -167,6 +167,28 @@ nav.scrolled{background:rgba(6,10,20,.92)}
 .empty-state p{font-size:13px;color:var(--text-muted);max-width:400px;margin:0 auto}
 .empty-state code{font-family:var(--font-mono);background:var(--bg-elevated);padding:2px 8px;border-radius:6px;font-size:12px;color:var(--blue)}
 
+/* ===== MEMORY ===== */
+.memory-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px}
+.memory-project-card{background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:16px;padding:24px;transition:all .3s var(--ease-out-expo)}
+.memory-project-card:hover{border-color:var(--border-hover);transform:translateY(-2px)}
+.memory-project-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.memory-project-name{font-family:var(--font-display);font-weight:700;font-size:16px}
+.memory-project-count{font-family:var(--font-mono);font-size:11px;color:var(--text-muted);background:var(--bg-elevated);padding:4px 10px;border-radius:100px}
+.memory-list{display:flex;flex-direction:column;gap:8px}
+.memory-item{background:var(--bg-elevated);border:1px solid var(--border-subtle);border-radius:10px;padding:12px 16px}
+.memory-key{font-family:var(--font-mono);font-size:12px;font-weight:600;color:var(--blue);margin-bottom:4px}
+.memory-value{font-size:13px;color:var(--text-secondary);word-break:break-word;line-height:1.5}
+.memory-tags{display:flex;flex-wrap:wrap;gap:4px;margin-top:8px}
+.memory-tag{font-family:var(--font-mono);font-size:10px;padding:2px 8px;border-radius:100px;background:var(--bg-surface);color:var(--purple);border:1px solid rgba(139,92,246,.15)}
+.memory-empty{text-align:center;padding:48px 20px;background:var(--bg-surface);border:1px dashed var(--border-subtle);border-radius:16px}
+.memory-empty h3{font-family:var(--font-display);font-size:16px;margin-bottom:8px;color:var(--text-secondary)}
+.memory-empty p{font-size:13px;color:var(--text-muted);max-width:400px;margin:0 auto}
+.memory-empty code{font-family:var(--font-mono);background:var(--bg-elevated);padding:2px 8px;border-radius:6px;font-size:12px;color:var(--purple)}
+.memory-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px}
+.memory-stat{text-align:center;padding:12px;background:var(--bg-elevated);border-radius:10px}
+.memory-stat-value{font-family:var(--font-display);font-weight:700;font-size:20px;color:var(--purple)}
+.memory-stat-label{font-size:11px;color:var(--text-muted);font-family:var(--font-mono)}
+
 /* ===== FEATURES ===== */
 .features-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-top:40px}
 .feature-card{background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:16px;padding:32px;transition:all .3s var(--ease-out-expo);position:relative}
@@ -320,6 +342,7 @@ footer{border-top:1px solid var(--border-subtle);padding:40px 0;margin-top:40px}
       <a href="#status">Status</a>
       <a href="#projects">Projects</a>
       <a href="#embeddings">Code Map</a>
+      <a href="#memory">Memory</a>
       <a href="#features">Features</a>
       <a href="#quickstart">Quick Start</a>
     </div>
@@ -454,6 +477,14 @@ footer{border-top:1px solid var(--border-subtle);padding:40px 0;margin-top:40px}
     </div>
   </div>
   <div id="projects-container"></div>
+</section>
+
+<!-- MEMORY -->
+<section id="memory">
+  <div class="section-label reveal">Persistent Memory</div>
+  <h2 class="section-title reveal reveal-delay-1">Project Memory</h2>
+  <p class="section-desc reveal reveal-delay-2">Persistent knowledge stored across sessions — environment paths, build commands, architectural decisions.</p>
+  <div id="memory-container" style="margin-top:24px"></div>
 </section>
 
 <!-- FEATURES -->
@@ -909,6 +940,79 @@ function escHtml(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(
 
 loadProjects();
 setInterval(loadProjects,15000);
+
+// ===== MEMORY =====
+async function loadMemories() {
+  const container = document.getElementById('memory-container');
+  if (!container) return;
+  try {
+    const r = await fetch(API_BASE + '/api/memories', {signal: AbortSignal.timeout(3000)});
+    if (!r.ok) { renderMemoryEmpty(container); return; }
+    const data = await r.json();
+    const projects = data.projects || [];
+    if (projects.length === 0) { renderMemoryEmpty(container); return; }
+    renderMemories(container, projects);
+  } catch(e) { renderMemoryEmpty(container); }
+}
+
+function renderMemories(container, projects) {
+  container.innerHTML = '';
+  // Stats row
+  const totalMem = projects.reduce((s,p) => s + p.count, 0);
+  const statsHtml = `
+    <div class="memory-stats reveal visible">
+      <div class="memory-stat"><div class="memory-stat-value">${totalMem}</div><div class="memory-stat-label">Total Memories</div></div>
+      <div class="memory-stat"><div class="memory-stat-value">${projects.length}</div><div class="memory-stat-label">Projects</div></div>
+      <div class="memory-stat"><div class="memory-stat-value">${getAllTags(projects).length}</div><div class="memory-stat-label">Unique Tags</div></div>
+    </div>`;
+  container.insertAdjacentHTML('beforeend', statsHtml);
+
+  const grid = document.createElement('div');
+  grid.className = 'memory-grid';
+  projects.forEach(proj => {
+    const card = document.createElement('div');
+    card.className = 'memory-project-card reveal visible';
+    let memoriesHtml = '';
+    const shown = proj.memories.slice(0, 5);
+    shown.forEach(m => {
+      const tagsHtml = (m.tags || []).map(t => `<span class="memory-tag">${escHtml(t)}</span>`).join('');
+      memoriesHtml += `
+        <div class="memory-item">
+          <div class="memory-key">${escHtml(m.key)}</div>
+          <div class="memory-value">${escHtml((m.value || '').substring(0, 150))}</div>
+          ${tagsHtml ? '<div class="memory-tags">' + tagsHtml + '</div>' : ''}
+        </div>`;
+    });
+    if (proj.count > 5) {
+      memoriesHtml += `<div style="text-align:center;padding:8px;font-size:12px;color:var(--text-muted);font-family:var(--font-mono)">+${proj.count - 5} more</div>`;
+    }
+    card.innerHTML = `
+      <div class="memory-project-header">
+        <div class="memory-project-name">${escHtml(proj.project_name)}</div>
+        <div class="memory-project-count">${proj.count} memories</div>
+      </div>
+      <div class="memory-list">${memoriesHtml}</div>`;
+    grid.appendChild(card);
+  });
+  container.appendChild(grid);
+}
+
+function renderMemoryEmpty(container) {
+  container.innerHTML = `
+    <div class="memory-empty">
+      <h3>No memories stored yet</h3>
+      <p>Store project knowledge with:<br><code>store_memory(project_path, key, value, tags)</code></p>
+    </div>`;
+}
+
+function getAllTags(projects) {
+  const tags = new Set();
+  projects.forEach(p => p.memories.forEach(m => (m.tags || []).forEach(t => tags.add(t))));
+  return [...tags];
+}
+
+loadMemories();
+setInterval(loadMemories, 15000);
 
 // ===== EMBEDDING VISUALIZATION =====
 const EMBED_COLORS = [

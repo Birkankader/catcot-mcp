@@ -5,26 +5,11 @@ stored in ChromaDB, grouping related files into logical components,
 and identifying inter-component relationships.
 """
 
-import hashlib
 import math
 import os
 from collections import defaultdict
-from pathlib import Path
 
-import chromadb
-
-CHROMA_DIR = os.path.expanduser("~/.code-rag-mcp/chroma_db")
-
-
-def _collection_name(project_path: str) -> str:
-    """Generate a stable collection name from project path."""
-    h = hashlib.md5(project_path.encode()).hexdigest()[:12]
-    base = Path(project_path).name.replace(" ", "_")[:30]
-    return f"{base}_{h}"
-
-
-def _get_client() -> chromadb.ClientAPI:
-    return chromadb.PersistentClient(path=CHROMA_DIR)
+from config import collection_name, get_chroma_client
 
 
 def _cosine_similarity(a: list[float], b: list[float]) -> float:
@@ -162,8 +147,8 @@ async def generate_project_map(project_path: str) -> dict:
     """
     project_path = os.path.abspath(os.path.expanduser(project_path))
 
-    client = _get_client()
-    col_name = _collection_name(project_path)
+    client = get_chroma_client()
+    col_name = collection_name(project_path)
 
     try:
         collection = client.get_collection(col_name)

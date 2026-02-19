@@ -31,6 +31,12 @@ from git_tools import (
 from topology import generate_project_map as do_project_map
 from context_expander import get_chunk_context as do_get_context
 from watcher import start_watching, stop_watching, list_watched
+from memory import (
+    store_memory as do_store_memory,
+    recall_memory as do_recall_memory,
+    list_memories as do_list_memories,
+    delete_memory as do_delete_memory,
+)
 
 mcp = FastMCP("catcot")
 
@@ -515,6 +521,121 @@ async def watch_project(project_path: str, action: str = "start") -> str:
         return "\n".join(lines)
     else:
         return f"[Catcot] Unknown action: '{action}'. Use 'start', 'stop', or 'status'."
+
+
+# ---------------------------------------------------------------------------
+# Feature: Persistent Memory
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+async def store_memory(
+    project_path: str, key: str, value: str, tags: str = "", source: str = "ai"
+) -> str:
+    """Store a persistent memory for a project. Memories survive across sessions.
+
+    Use this to remember things like JDK paths, build commands, environment
+    details, architectural decisions, or any project-specific knowledge that
+    should persist between conversations.
+
+    Args:
+        project_path: Absolute path to the project this memory belongs to.
+        key: Unique key for this memory (e.g. "jdk_path", "build_command").
+        value: The value to remember.
+        tags: Comma-separated tags for categorization (e.g. "env,java,path").
+        source: Who stored it — "ai" or "user" (default: "ai").
+    """
+    project_path = os.path.abspath(os.path.expanduser(project_path))
+    tag_list = [t.strip() for t in tags.split(",") if t.strip()] if tags else []
+    entry = await do_store_memory(
+        project_path=project_path,
+        key=key,
+        value=value,
+        tags=tag_list,
+        source=source,
+    )
+    return f"[Catcot Memory] Stored: {key} = {value[:100]}"
+
+
+@mcp.tool()
+async def recall_memory(
+    project_path: str,
+    query: str = "",
+    key: str = "",
+    tags: str = "",
+    top_k: int = 5,
+) -> str:
+    """Recall stored memories for a project. Search by key, tags, or natural language.
+
+    Use this to retrieve previously stored project knowledge — environment paths,
+    build commands, architectural notes, etc.
+
+    Args:
+        project_path: Absolute path to the project.
+        query: Natural language query for semantic memory search.
+        key: Exact key to look up (e.g. "jdk_path").
+        tags: Comma-separated tags to filter by (e.g. "env,java").
+        top_k: Max results for semantic search (default: 5).
+    """
+    project_path = os.path.abspath(os.path.expanduser(project_path))
+    tag_list = [t.strip() for t in tags.split(",") if t.strip()] if tags else None
+    results = await do_recall_memory(
+        project_path=project_path,
+        query=query or None,
+        key=key or None,
+        tags=tag_list,
+        top_k=top_k,
+    )
+    if not results:
+        return "[Catcot Memory] No memories found."
+
+    formatted = []
+    for m in results:
+        tag_str = ", ".join(m.get("tags", []))
+        formatted.append(
+            f"**{m['key']}**: {m['value']}"
+            + (f"  [tags: {tag_str}]" if tag_str else "")
+        )
+    return f"[Catcot Memory] Found {len(results)} memories:\n\n" + "\n".join(formatted)
+
+
+@mcp.tool()
+async def list_project_memories(project_path: str) -> str:
+    """List all stored memories for a project.
+
+    Shows all persistent memories with their keys, values, tags, and metadata.
+
+    Args:
+        project_path: Absolute path to the project.
+    """
+    project_path = os.path.abspath(os.path.expanduser(project_path))
+    memories = do_list_memories(project_path)
+    if not memories:
+        return "[Catcot Memory] No memories stored for this project."
+
+    lines = [f"[Catcot Memory] {len(memories)} memories for {os.path.basename(project_path)}:\n"]
+    for m in memories:
+        tag_str = ", ".join(m.get("tags", []))
+        lines.append(
+            f"  - **{m['key']}**: {m['value'][:80]}"
+            + (f"  [tags: {tag_str}]" if tag_str else "")
+        )
+    return "\n".join(lines)
+
+
+@mcp.tool()
+async def delete_project_memory(project_path: str, key: str) -> str:
+    """Delete a specific memory by key.
+
+    Args:
+        project_path: Absolute path to the project.
+        key: The key of the memory to delete.
+    """
+    project_path = os.path.abspath(os.path.expanduser(project_path))
+    deleted = await do_delete_memory(project_path, key)
+    if deleted:
+        return f"[Catcot Memory] Deleted memory: {key}"
+    return f"[Catcot Memory] Memory not found: {key}"
 
 
 if __name__ == "__main__":

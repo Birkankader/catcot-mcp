@@ -4,9 +4,8 @@ import hashlib
 import os
 from pathlib import Path
 
-import chromadb
-
 from chunkers import Chunk, get_chunker
+from config import CHROMA_DIR, collection_name, get_chroma_client
 from embedder import embed_texts, get_provider_info
 
 # Default ignore patterns
@@ -24,16 +23,6 @@ IGNORE_EXTENSIONS = {
 }
 
 MAX_FILE_SIZE = 500_000  # 500KB
-
-CHROMA_DIR = os.path.expanduser("~/.code-rag-mcp/chroma_db")
-
-
-def _collection_name(project_path: str) -> str:
-    """Generate a stable collection name from project path."""
-    h = hashlib.md5(project_path.encode()).hexdigest()[:12]
-    # ChromaDB collection names: 3-63 chars, alphanumeric + underscores/hyphens
-    base = Path(project_path).name.replace(" ", "_")[:30]
-    return f"{base}_{h}"
 
 
 def _file_hash(content: str) -> str:
@@ -71,11 +60,6 @@ def _matches_gitignore(rel_path: str, patterns: list[str]) -> bool:
     return False
 
 
-def _get_client() -> chromadb.ClientAPI:
-    os.makedirs(CHROMA_DIR, exist_ok=True)
-    return chromadb.PersistentClient(path=CHROMA_DIR)
-
-
 def _collect_files(project_path: Path, gitignore_patterns: list[str]) -> list[Path]:
     """Collect all indexable files from project."""
     files = []
@@ -105,8 +89,8 @@ async def index_project(project_path: str, reindex: bool = False) -> dict:
     if not path.is_dir():
         raise ValueError(f"Not a directory: {project_path}")
 
-    client = _get_client()
-    col_name = _collection_name(project_path)
+    client = get_chroma_client()
+    col_name = collection_name(project_path)
 
     if reindex:
         try:
@@ -145,9 +129,9 @@ async def index_project(project_path: str, reindex: bool = False) -> dict:
             )
 
     # Ensure metadata is written (get_or_create_collection ignores metadata for existing collections)
+    # Note: hnsw:space cannot be changed after creation, so exclude it from modify
     collection.modify(metadata={
         "project_path": project_path,
-        "hnsw:space": "cosine",
         "embedding_provider": provider["name"],
         "embedding_model": provider["model"],
         "embedding_dimensions": provider["dimensions"],
@@ -242,7 +226,7 @@ async def index_project(project_path: str, reindex: bool = False) -> dict:
 
 def list_indexed_projects() -> list[dict]:
     """List all indexed projects."""
-    client = _get_client()
+    client = get_chroma_client()
     collections = client.list_collections()
     projects = []
     for col in collections:

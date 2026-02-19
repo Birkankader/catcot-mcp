@@ -18,15 +18,12 @@ except ImportError:
     class FileSystemEventHandler:  # type: ignore
         pass
 
-import chromadb
-
 from chunkers import get_chunker, Chunk
+from config import collection_name, get_chroma_client
 from embedder import embed_texts, get_provider_info
 from indexer import (
     IGNORE_DIRS,
     IGNORE_EXTENSIONS,
-    CHROMA_DIR,
-    _collection_name,
     _file_hash,
     _should_ignore,
 )
@@ -44,11 +41,6 @@ class _WatcherState:
 
 
 _watcher_state = _WatcherState()
-
-
-def _get_client() -> chromadb.ClientAPI:
-    os.makedirs(CHROMA_DIR, exist_ok=True)
-    return chromadb.PersistentClient(path=CHROMA_DIR)
 
 
 async def _index_single_file(project_path: str, file_path: str) -> dict:
@@ -79,8 +71,8 @@ async def _index_single_file(project_path: str, file_path: str) -> dict:
     except Exception as e:
         return {"status": "read_error", "file_path": file_path, "error": str(e)}
     
-    client = _get_client()
-    col_name = _collection_name(project_path)
+    client = get_chroma_client()
+    col_name = collection_name(project_path)
     
     try:
         collection = client.get_collection(col_name)
@@ -262,8 +254,8 @@ class _FileWatcherHandler(FileSystemEventHandler):
         except ValueError:
             return
         
-        client = _get_client()
-        col_name = _collection_name(project_path)
+        client = get_chroma_client()
+        col_name = collection_name(project_path)
         
         try:
             collection = client.get_collection(col_name)

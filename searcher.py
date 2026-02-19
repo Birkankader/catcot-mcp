@@ -1,24 +1,9 @@
 """Searches indexed code using vector similarity."""
 
-import hashlib
 import os
-from pathlib import Path
 
-import chromadb
-
+from config import collection_name, get_chroma_client
 from embedder import embed_query, get_provider_info
-
-CHROMA_DIR = os.path.expanduser("~/.code-rag-mcp/chroma_db")
-
-
-def _collection_name(project_path: str) -> str:
-    h = hashlib.md5(project_path.encode()).hexdigest()[:12]
-    base = Path(project_path).name.replace(" ", "_")[:30]
-    return f"{base}_{h}"
-
-
-def _get_client() -> chromadb.ClientAPI:
-    return chromadb.PersistentClient(path=CHROMA_DIR)
 
 
 async def search_code(
@@ -31,13 +16,13 @@ async def search_code(
     If project_path is None, searches all indexed projects.
     Returns list of results with file_path, start_line, end_line, content, score.
     """
-    client = _get_client()
+    client = get_chroma_client()
     query_embedding = await embed_query(query)
 
     collections_to_search = []
     if project_path:
         project_path = os.path.abspath(os.path.expanduser(project_path))
-        col_name = _collection_name(project_path)
+        col_name = collection_name(project_path)
         try:
             col = client.get_collection(col_name)
             collections_to_search.append(col)

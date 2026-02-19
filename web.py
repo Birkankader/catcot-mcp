@@ -8,12 +8,10 @@ from functools import partial
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from pathlib import Path
 
-import chromadb
-
+from config import CHROMA_DIR, MEMORY_DIR, get_chroma_client
 from embedder import get_provider_info
+from memory import list_memories, get_memory_stats
 from savings import get_savings_summary
-
-CHROMA_DIR = os.path.expanduser("~/.code-rag-mcp/chroma_db")
 DASHBOARD_PATH = Path(__file__).parent / "dashboard.html"
 DEFAULT_PORT = 9847
 
@@ -36,6 +34,8 @@ class DashboardHandler(SimpleHTTPRequestHandler):
             self._api_savings()
         elif self.path == "/api/embeddings":
             self._api_embeddings()
+        elif self.path == "/api/memories":
+            self._api_memories()
         else:
             self.send_error(404)
 
@@ -69,7 +69,7 @@ class DashboardHandler(SimpleHTTPRequestHandler):
 
         # Check ChromaDB
         try:
-            client = chromadb.PersistentClient(path=CHROMA_DIR)
+            client = get_chroma_client()
             collections = client.list_collections()
             status["chromadb"] = True
             status["chroma_detail"] = f"{len(collections)} collection(s)"
@@ -81,8 +81,7 @@ class DashboardHandler(SimpleHTTPRequestHandler):
 
     def _api_projects(self):
         try:
-            os.makedirs(CHROMA_DIR, exist_ok=True)
-            client = chromadb.PersistentClient(path=CHROMA_DIR)
+            client = get_chroma_client()
             collections = client.list_collections()
             projects = []
             for col in collections:
@@ -115,8 +114,7 @@ class DashboardHandler(SimpleHTTPRequestHandler):
     def _api_embeddings(self):
         """Return 2-D projected embeddings for all indexed code chunks."""
         try:
-            os.makedirs(CHROMA_DIR, exist_ok=True)
-            client = chromadb.PersistentClient(path=CHROMA_DIR)
+            client = get_chroma_client()
             collections = client.list_collections()
 
             points = []
@@ -170,6 +168,33 @@ class DashboardHandler(SimpleHTTPRequestHandler):
             self._send_json(points)
         except Exception as e:
             self._send_json([])
+
+    def _api_memories(self):
+        """Return all memories grouped by project."""
+        try:
+            result = {"projects": []}
+            if os.path.isdir(MEMORY_DIR):
+                for fname in os.listdir(MEMORY_DIR):
+                    if not fname.endswith(".json"):
+                        continue
+                    fpath = os.path.join(MEMORY_DIR, fname)
+                    try:
+                        with open(fpath, "r") as f:
+                            memories = json.load(f)
+                        if memories:
+                            project_path = memories[0].get("project_path", fname)
+                            project_name = os.path.basename(project_path)
+                            result["projects"].append({
+                                "project_path": project_path,
+                                "project_name": project_name,
+                                "memories": memories,
+                                "count": len(memories),
+                            })
+                    except (json.JSONDecodeError, IOError):
+                        continue
+            self._send_json(result)
+        except Exception:
+            self._send_json({"projects": []})
 
     def _send_json(self, data):
         body = json.dumps(data).encode("utf-8")

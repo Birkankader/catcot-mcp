@@ -10,7 +10,7 @@
 
 ---
 
-Catcot is a local MCP server that gives Claude Code semantic code search superpowers. It indexes your projects using Ollama embeddings and ChromaDB, then serves relevant code chunks instead of whole files — saving tokens and money.
+Catcot is a local MCP server that gives Claude Code semantic code search superpowers. It indexes your projects using multi-provider embeddings and ChromaDB, then serves relevant code chunks instead of whole files — saving tokens and money.
 
 ## Features
 
@@ -21,18 +21,19 @@ Catcot is a local MCP server that gives Claude Code semantic code search superpo
 - **Tree-sitter Chunking** — AST-aware code splitting for accurate results
 - **Project Topology** — Visualize how your codebase clusters into components
 - **Context Expansion** — Expand search results to see surrounding code
+- **Persistent Memory** — Store project knowledge (env paths, build commands, arch decisions) across sessions
 - **Watch Mode** — Auto-reindex files as you save them
-- **Web Dashboard** — Visual overview with savings stats and embedding map
+- **Web Dashboard** — Visual overview with savings stats, embedding map, and memory browser
 
 ## Quick Start
 
 ### Prerequisites
 
 - Python 3.10+
-- [Ollama](https://ollama.com) running locally with an embedding model:
-  ```bash
-  ollama pull nomic-embed-text
-  ```
+- At least one embedding provider (auto-detected, local-first):
+  - **Ollama** (recommended): `ollama pull nomic-embed-text`
+  - **Local/ONNX**: `pip install fastembed` — no server needed
+  - **API-based**: Set `GOOGLE_API_KEY`, `OPENAI_API_KEY`, or `VOYAGE_API_KEY`
 
 ### Install
 
@@ -63,7 +64,7 @@ In Claude Code, just ask naturally:
 
 Claude will automatically use Catcot's tools.
 
-## Tools (10)
+## Tools (15)
 
 | Tool | Description |
 |------|-------------|
@@ -71,12 +72,17 @@ Claude will automatically use Catcot's tools.
 | `index_project` | Index a project directory |
 | `reindex_project` | Re-index from scratch |
 | `list_indexed_projects` | List all indexed projects |
+| `get_embedding_status` | Check active embedding provider and model |
 | `code_review` | AI-powered code review with semantic context |
 | `search_modified_files` | Search only in recently changed files (git) |
 | `review_diff` | Review git diff with related code context |
 | `generate_project_map` | Semantic map of project components |
 | `get_chunk_context` | Expand search results with surrounding lines |
 | `watch_project` | Start/stop auto-indexing on file save |
+| `store_memory` | Store persistent project knowledge across sessions |
+| `recall_memory` | Recall memories by key, tags, or natural language |
+| `list_project_memories` | List all stored memories for a project |
+| `delete_project_memory` | Delete a specific memory by key |
 
 ## Dashboard
 
@@ -92,6 +98,20 @@ Opens at `http://localhost:9850` with:
 - 2D embedding space visualization
 - Architecture and quickstart guide
 
+## Embedding Providers
+
+Catcot auto-detects the best available embedding provider with a **local-first** approach:
+
+| Priority | Provider | Model | Dimensions | Requires |
+|----------|----------|-------|------------|----------|
+| 1 | Ollama | nomic-embed-text | 768 | `ollama serve` |
+| 2 | Local/ONNX | BAAI/bge-small-en-v1.5 | 384 | `pip install fastembed` |
+| 3 | Google | text-embedding-004 | 768 | `GOOGLE_API_KEY` |
+| 4 | OpenAI | text-embedding-3-small | 1536 | `OPENAI_API_KEY` |
+| 5 | Voyage | voyage-3-lite | 512 | `VOYAGE_API_KEY` |
+
+Force a specific provider: `CATCOT_EMBEDDING_PROVIDER=ollama|local|google|openai|voyage`
+
 ## Supported Languages
 
 Tree-sitter AST chunking (preferred): **Python, JavaScript, TypeScript, TSX, Java, Kotlin, SQL**
@@ -101,19 +121,21 @@ Other file types fall back to a generic sliding-window chunker.
 ## Architecture
 
 ```
-server.py          → MCP server (FastMCP, stdio transport)
-searcher.py        → ChromaDB vector search
-indexer.py         → File scanning & chunk indexing
-embedder.py        → Ollama embedding client
-savings.py         → Token savings tracker
-reviewer.py        → Multi-model code review
-git_tools.py       → Git integration (status, diff, log)
-topology.py        → Project component clustering
+server.py           → MCP server (FastMCP, stdio transport)
+config.py           → Centralized configuration & shared helpers
+searcher.py         → ChromaDB vector search
+indexer.py          → File scanning & chunk indexing
+embedder.py         → Multi-provider embedding client
+memory.py           → Persistent memory system (JSON + ChromaDB)
+savings.py          → Token savings tracker
+reviewer.py         → Multi-model code review
+git_tools.py        → Git integration (status, diff, log)
+topology.py         → Project component clustering
 context_expander.py → Chunk context expansion
-watcher.py         → Watchdog file watcher
-web.py             → Dashboard HTTP server
-dashboard.html     → Web dashboard UI
-chunkers/          → Code chunkers (tree-sitter + regex fallbacks)
+watcher.py          → Watchdog file watcher
+web.py              → Dashboard HTTP server
+dashboard.html      → Web dashboard UI
+chunkers/           → Code chunkers (tree-sitter + regex fallbacks)
 ```
 
 ## License

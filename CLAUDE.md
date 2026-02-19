@@ -28,6 +28,12 @@ When you need to find code in a project, **always use Catcot's `search_code` too
 #### Watch Mode
 - `watch_project(project_path, action)` — Start/stop auto-indexing. When watching, Catcot automatically re-indexes files as they are saved. Actions: "start", "stop", "status".
 
+#### Memory Tools (Persistent Knowledge)
+- `store_memory(project_path, key, value, tags, source)` — Store persistent knowledge for a project. Survives across sessions. Use for environment paths, build commands, architectural decisions, etc. Tags are comma-separated.
+- `recall_memory(project_path, query, key, tags, top_k)` — Recall stored memories. Search by exact key, filter by tags, or use natural language for semantic search.
+- `list_project_memories(project_path)` — List all stored memories for a project.
+- `delete_project_memory(project_path, key)` — Delete a specific memory by key.
+
 ### Best Practices
 - Use descriptive natural language queries: "authentication middleware" instead of "auth"
 - Catcot returns ranked code chunks with file paths and line numbers
@@ -39,6 +45,12 @@ When you need to find code in a project, **always use Catcot's `search_code` too
 - Use `get_chunk_context` to expand search results when you need more surrounding code
 - Use `watch_project` to enable auto-indexing during active development
 - `code_review` supports multiple backends: "auto", "gemini", "ollama:model", "anthropic:model", "openai:model"
+- **Memory best practices:**
+  - Store environment-specific info early: JDK paths, Python versions, build commands
+  - Use descriptive keys: "jdk_path", "build_command", "db_connection_string"
+  - Tag memories for easy filtering: "env", "build", "arch", "config"
+  - Use `recall_memory` with natural language to find related knowledge
+  - Memories persist in `~/.code-rag-mcp/memory/` as JSON + ChromaDB embeddings
 
 ### Chunking
 Catcot uses two chunking strategies:

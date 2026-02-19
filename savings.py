@@ -6,8 +6,7 @@ import time
 from datetime import datetime, date
 from pathlib import Path
 
-SAVINGS_DIR = os.path.expanduser("~/.code-rag-mcp")
-SAVINGS_FILE = os.path.join(SAVINGS_DIR, "savings.json")
+from config import BASE_DIR, SAVINGS_FILE
 
 # Token estimation: ~4 characters = 1 token
 CHARS_PER_TOKEN = 4
@@ -52,7 +51,7 @@ def _load_data() -> dict:
 
 def _save_data(data: dict) -> None:
     """Persist savings data to disk."""
-    os.makedirs(SAVINGS_DIR, exist_ok=True)
+    os.makedirs(BASE_DIR, exist_ok=True)
     with open(SAVINGS_FILE, "w") as f:
         json.dump(data, f, indent=2)
 
