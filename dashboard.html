@@ -416,10 +416,10 @@ footer{border-top:1px solid var(--border-subtle);padding:40px 0;margin-top:40px}
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
       </div>
       <div class="status-info">
-        <div class="status-name">Ollama</div>
-        <div class="status-detail" id="ollama-detail">Checking...</div>
+        <div class="status-name" id="embed-provider-name">Embeddings</div>
+        <div class="status-detail" id="embed-detail">Checking...</div>
       </div>
-      <div class="status-indicator checking" id="ollama-status"></div>
+      <div class="status-indicator checking" id="embed-status"></div>
     </div>
     <div class="status-card reveal reveal-delay-2">
       <div class="status-icon chroma">
@@ -558,8 +558,8 @@ footer{border-top:1px solid var(--border-subtle);padding:40px 0;margin-top:40px}
         <div class="arch-node-icon">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
         </div>
-        <div class="arch-node-label">Ollama</div>
-        <div class="arch-node-sub">nomic-embed-text</div>
+        <div class="arch-node-label">Embeddings</div>
+        <div class="arch-node-sub">multi-provider</div>
       </div>
     </div>
     <div class="arch-arrow"><svg viewBox="0 0 40 20"><path d="M0 10 L30 10 M25 5 L32 10 L25 15" stroke="currentColor" stroke-width="1.5" fill="none"/></svg><div class="flow-dot"></div></div>
@@ -658,7 +658,7 @@ footer{border-top:1px solid var(--border-subtle);padding:40px 0;margin-top:40px}
       <svg width="24" height="24"><use href="#catcot-logo"/></svg>
       <span>Catcot</span>
     </div>
-    <div class="footer-right">Local MCP Server &middot; Ollama + ChromaDB &middot; MIT License</div>
+    <div class="footer-right">Local MCP Server &middot; Multi-Provider Embeddings + ChromaDB &middot; MIT License</div>
   </div>
 </footer>
 
@@ -771,24 +771,29 @@ const API_BASE=window.location.origin;
 
 async function checkStatus(){
   try{
-    const r=await fetch('http://localhost:11434/api/version',{signal:AbortSignal.timeout(3000)});
-    if(r.ok){
-      const d=await r.json();
-      setStatus('ollama','online','v'+(d.version||'connected'));
-    }else{setStatus('ollama','offline','Not responding')}
-  }catch(e){setStatus('ollama','offline','Not running')}
-
-  try{
     const r=await fetch(API_BASE+'/api/status',{signal:AbortSignal.timeout(3000)});
     if(r.ok){
       const d=await r.json();
+      // Embedding provider
+      if(d.embedding){
+        const provName=d.embedding_provider||'unknown';
+        const nameEl=document.getElementById('embed-provider-name');
+        if(nameEl) nameEl.textContent=provName.charAt(0).toUpperCase()+provName.slice(1);
+        setStatus('embed','online',d.embedding_detail||'Connected');
+      }else{
+        setStatus('embed','offline',d.embedding_detail||'No provider');
+      }
+      // ChromaDB
       setStatus('chroma',d.chromadb?'online':'offline',d.chromadb?d.chroma_detail||'Connected':'Not available');
+      // MCP
       setStatus('mcp','online',d.mcp_detail||'Catcot running on stdio');
     }else{
+      setStatus('embed','offline','API unreachable');
       setStatus('chroma','offline','API unreachable');
       setStatus('mcp','online','Dashboard active');
     }
   }catch(e){
+    setStatus('embed','checking','Checking...');
     setStatus('chroma','checking','Checking...');
     setStatus('mcp','online','Dashboard active');
   }
@@ -871,6 +876,8 @@ function renderProjects(container,projects){
   projects.forEach(p=>{
     const name=p.project_path?p.project_path.split('/').pop():p.name;
     const card=document.createElement('div');card.className='project-card reveal visible';
+    const prov = p.embedding_provider || 'ollama';
+    const provModel = p.embedding_model || 'unknown';
     card.innerHTML=`
       <div class="project-name">${escHtml(name)}</div>
       <div class="project-path">${escHtml(p.project_path||'')}</div>
@@ -878,6 +885,10 @@ function renderProjects(container,projects){
         <div class="project-stat">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 002 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0022 16z"/></svg>
           <span class="val">${p.chunks||0}</span> chunks
+        </div>
+        <div class="project-stat">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+          <span class="val">${escHtml(prov)}</span> <span style="color:var(--text-muted);font-size:11px">${escHtml(provModel)}</span>
         </div>
       </div>`;
     grid.appendChild(card);

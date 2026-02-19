@@ -1,6 +1,6 @@
 """Catcot -- Semantic Code Search MCP Server.
 
-Provides semantic code search using local embeddings (Ollama) and ChromaDB.
+Provides semantic code search using multi-provider embeddings and ChromaDB.
 Designed for Claude Code integration via MCP protocol.
 Includes token savings tracking, code review, git integration, and
 project topology analysis capabilities.
@@ -9,12 +9,14 @@ project topology analysis capabilities.
 import json
 import os
 import sys
+import time
 
 # Ensure local imports work
 sys.path.insert(0, os.path.dirname(__file__))
 
 from mcp.server import FastMCP
 
+from embedder import get_provider_info
 from indexer import index_project as do_index, list_indexed_projects as do_list
 from searcher import search_code as do_search
 from savings import record_search, get_savings_summary
@@ -38,13 +40,24 @@ async def index_project(path: str) -> str:
     """Index a project directory for Catcot semantic code search.
 
     Scans files, splits into meaningful chunks (by class/function/etc.),
-    embeds them using local Ollama, and stores in ChromaDB.
+    embeds them using the active embedding provider, and stores in ChromaDB.
     Skips unchanged files on subsequent runs.
 
     Args:
         path: Absolute path to the project directory to index.
     """
+    provider = get_provider_info()
+    sys.stderr.write(f"[Catcot] Indexing {path} using {provider['name']} ({provider['model']})\n")
+    t0 = time.time()
     stats = await do_index(path)
+    elapsed = time.time() - t0
+    stats["embedding_provider"] = provider["name"]
+    stats["embedding_model"] = provider["model"]
+    stats["elapsed_seconds"] = round(elapsed, 1)
+    sys.stderr.write(
+        f"[Catcot] Indexed {stats['files_indexed']} files, "
+        f"{stats['chunks_created']} chunks in {elapsed:.1f}s\n"
+    )
     return json.dumps(stats, indent=2)
 
 
@@ -61,11 +74,16 @@ async def search_code(query: str, project_path: str = "", top_k: int = 5) -> str
         project_path: Optional: limit search to a specific project path.
         top_k: Number of results to return (default: 5).
     """
+    provider = get_provider_info()
+    sys.stderr.write(f"[Catcot] Searching: \"{query}\" via {provider['name']}\n")
+    t0 = time.time()
     results = await do_search(
         query=query,
         project_path=project_path or None,
         top_k=top_k,
     )
+    elapsed = time.time() - t0
+    sys.stderr.write(f"[Catcot] Found {len(results)} results in {elapsed:.2f}s\n")
 
     # Record savings
     savings = record_search(
@@ -101,7 +119,18 @@ async def reindex_project(path: str) -> str:
     Args:
         path: Absolute path to the project directory to re-index.
     """
+    provider = get_provider_info()
+    sys.stderr.write(f"[Catcot] Re-indexing {path} from scratch using {provider['name']} ({provider['model']})\n")
+    t0 = time.time()
     stats = await do_index(path, reindex=True)
+    elapsed = time.time() - t0
+    stats["embedding_provider"] = provider["name"]
+    stats["embedding_model"] = provider["model"]
+    stats["elapsed_seconds"] = round(elapsed, 1)
+    sys.stderr.write(
+        f"[Catcot] Re-indexed {stats['files_indexed']} files, "
+        f"{stats['chunks_created']} chunks in {elapsed:.1f}s\n"
+    )
     return f"[Catcot] Re-indexed from scratch:\n{json.dumps(stats, indent=2)}"
 
 
@@ -111,7 +140,31 @@ async def list_indexed_projects() -> str:
     projects = do_list()
     if not projects:
         return "[Catcot] No projects indexed yet."
-    return json.dumps(projects, indent=2)
+    provider = get_provider_info()
+    header = f"[Catcot] Active provider: {provider['name']} ({provider['model']})\n\n"
+    return header + json.dumps(projects, indent=2)
+
+
+@mcp.tool()
+async def get_embedding_status() -> str:
+    """Show the active embedding provider, model, and dimensions.
+
+    Use this to check which embedding provider Catcot is currently using.
+    """
+    try:
+        provider = get_provider_info()
+        return json.dumps({
+            "provider": provider["name"],
+            "model": provider["model"],
+            "dimensions": provider["dimensions"],
+            "status": "active",
+        }, indent=2)
+    except RuntimeError as e:
+        return json.dumps({
+            "provider": None,
+            "status": "unavailable",
+            "error": str(e),
+        }, indent=2)
 
 
 @mcp.tool()
@@ -466,6 +519,14 @@ async def watch_project(project_path: str, action: str = "start") -> str:
 
 if __name__ == "__main__":
     from web import start_dashboard
+    try:
+        provider = get_provider_info()
+        sys.stderr.write(
+            f"[Catcot] Embedding provider: {provider['name']} "
+            f"(model: {provider['model']}, dims: {provider['dimensions']})\n"
+        )
+    except RuntimeError as e:
+        sys.stderr.write(f"[Catcot] Warning: {e}\n")
     port = start_dashboard(open_browser=True)
     sys.stderr.write(f"[Catcot] Dashboard running at http://localhost:{port}\n")
     mcp.run(transport="stdio")

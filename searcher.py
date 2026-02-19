@@ -6,7 +6,7 @@ from pathlib import Path
 
 import chromadb
 
-from embedder import embed_query
+from embedder import embed_query, get_provider_info
 
 CHROMA_DIR = os.path.expanduser("~/.code-rag-mcp/chroma_db")
 
@@ -48,9 +48,21 @@ async def search_code(
     else:
         collections_to_search = client.list_collections()
 
+    # Filter out collections indexed with a different provider
+    current_provider = get_provider_info()["name"]
     all_results = []
     for col in collections_to_search:
         if col.count() == 0:
+            continue
+        col_meta = col.metadata or {}
+        col_provider = col_meta.get("embedding_provider")
+        if col_provider and col_provider != current_provider:
+            import sys
+            proj = col_meta.get("project_path", col.name)
+            sys.stderr.write(
+                f"[Catcot] Skipping '{proj}': indexed with '{col_provider}', "
+                f"current provider is '{current_provider}'. Reindex to fix.\n"
+            )
             continue
         results = col.query(
             query_embeddings=[query_embedding],

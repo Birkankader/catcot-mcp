@@ -7,7 +7,7 @@ from pathlib import Path
 import chromadb
 
 from chunkers import Chunk, get_chunker
-from embedder import embed_texts
+from embedder import embed_texts, get_provider_info
 
 # Default ignore patterns
 IGNORE_DIRS = {
@@ -114,10 +114,44 @@ async def index_project(project_path: str, reindex: bool = False) -> dict:
         except Exception:
             pass
 
+    # Get current provider info
+    provider = get_provider_info()
+
     collection = client.get_or_create_collection(
         name=col_name,
-        metadata={"project_path": project_path, "hnsw:space": "cosine"},
+        metadata={
+            "project_path": project_path,
+            "hnsw:space": "cosine",
+            "embedding_provider": provider["name"],
+            "embedding_model": provider["model"],
+            "embedding_dimensions": provider["dimensions"],
+        },
     )
+
+    # Check for provider mismatch on existing collections
+    col_meta = collection.metadata or {}
+    stored_provider = col_meta.get("embedding_provider")
+
+    if not reindex and collection.count() > 0:
+        if stored_provider is None:
+            # Legacy collection (no stored provider) — assume ollama
+            stored_provider = "ollama"
+
+        if stored_provider != provider["name"]:
+            raise RuntimeError(
+                f"Embedding provider mismatch: collection was indexed with '{stored_provider}' "
+                f"but current provider is '{provider['name']}'. "
+                f"Re-index the project to switch providers: reindex_project(\"{project_path}\")"
+            )
+
+    # Ensure metadata is written (get_or_create_collection ignores metadata for existing collections)
+    collection.modify(metadata={
+        "project_path": project_path,
+        "hnsw:space": "cosine",
+        "embedding_provider": provider["name"],
+        "embedding_model": provider["model"],
+        "embedding_dimensions": provider["dimensions"],
+    })
 
     # Load existing file hashes to skip unchanged files
     existing_hashes: dict[str, str] = {}
@@ -137,7 +171,6 @@ async def index_project(project_path: str, reindex: bool = False) -> dict:
     batch_ids: list[str] = []
     batch_docs: list[str] = []
     batch_metas: list[dict] = []
-    batch_embeddings: list[list[float]] = []
 
     BATCH_SIZE = 20  # Embed 20 chunks at a time
 
@@ -218,5 +251,7 @@ def list_indexed_projects() -> list[dict]:
             "name": col.name,
             "project_path": meta.get("project_path", "unknown"),
             "chunks": col.count(),
+            "embedding_provider": meta.get("embedding_provider", "ollama"),
+            "embedding_model": meta.get("embedding_model", "unknown"),
         })
     return projects

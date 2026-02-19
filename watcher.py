@@ -21,7 +21,7 @@ except ImportError:
 import chromadb
 
 from chunkers import get_chunker, Chunk
-from embedder import embed_texts
+from embedder import embed_texts, get_provider_info
 from indexer import (
     IGNORE_DIRS,
     IGNORE_EXTENSIONS,
@@ -90,7 +90,23 @@ async def _index_single_file(project_path: str, file_path: str) -> dict:
             "file_path": file_path,
             "message": "Project not indexed. Run index_project first.",
         }
-    
+
+    # Check provider mismatch
+    col_meta = collection.metadata or {}
+    stored_provider = col_meta.get("embedding_provider")
+    current_provider = get_provider_info()["name"]
+    if stored_provider and stored_provider != current_provider:
+        import sys
+        sys.stderr.write(
+            f"[Catcot Watcher] Skipping {file_path}: collection uses '{stored_provider}' "
+            f"but current provider is '{current_provider}'. Reindex to fix.\n"
+        )
+        return {
+            "status": "provider_mismatch",
+            "file_path": file_path,
+            "message": f"Provider mismatch: {stored_provider} vs {current_provider}",
+        }
+
     # Calculate relative path
     try:
         rel_path = str(Path(file_path).relative_to(project_path))
@@ -185,16 +201,14 @@ def _process_pending_files():
     if not pending:
         return
     
-    # Run async operations
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    
+    # Run async operations in an isolated loop (don't pollute global state)
     try:
         for file_path, info in pending.items():
             project_path = info["project_path"]
-            loop.run_until_complete(_index_single_file(project_path, file_path))
-    finally:
-        loop.close()
+            asyncio.run(_index_single_file(project_path, file_path))
+    except Exception as e:
+        import sys
+        sys.stderr.write(f"[Catcot Watcher] Error processing {file_path}: {e}\n")
 
 
 class _FileWatcherHandler(FileSystemEventHandler):

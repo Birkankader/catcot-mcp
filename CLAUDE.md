@@ -1,7 +1,7 @@
 # Catcot - Semantic Code Search MCP Server
 
 ## What is Catcot?
-Catcot is a local semantic code search tool that indexes your codebase and provides fast, intelligent search via the MCP protocol. It uses Ollama embeddings + ChromaDB for vector storage.
+Catcot is a local semantic code search tool that indexes your codebase and provides fast, intelligent search via the MCP protocol. It uses multi-provider embeddings + ChromaDB for vector storage.
 
 ## Usage Instructions for Claude Code
 
@@ -46,6 +46,30 @@ Catcot uses two chunking strategies:
 2. **Regex-based chunking** (fallback) — Pattern-matching based splitting by function/class boundaries. Used when tree-sitter is not installed.
 
 Supported languages: Python, JavaScript, TypeScript, TSX, Java, Kotlin, SQL. Other file types use a generic sliding-window chunker.
+
+### Embedding Providers
+Catcot auto-detects the embedding provider with a **local-first** approach — free local options are preferred over paid API calls.
+
+**Auto-detection priority** (first match wins):
+1. Ollama running locally → Ollama (nomic-embed-text, 768 dims)
+2. `fastembed` installed → Local/ONNX (BAAI/bge-small-en-v1.5, 384 dims) — no server needed
+3. `GOOGLE_API_KEY` or `GEMINI_API_KEY` → Google (text-embedding-004, 768 dims)
+4. `OPENAI_API_KEY` → OpenAI (text-embedding-3-small, 1536 dims)
+5. `VOYAGE_API_KEY` → Voyage (voyage-3-lite, 512 dims)
+
+**Zero-cost options:**
+- **Ollama**: `ollama serve` — needs Ollama installed, runs as a local server
+- **Local (fastembed)**: `pip install fastembed` — pure Python, no server, no API keys, runs on CPU
+
+**Force a specific provider:** `CATCOT_EMBEDDING_PROVIDER=ollama|local|google|openai|voyage`
+
+**Override default models:** `CATCOT_OLLAMA_MODEL`, `CATCOT_LOCAL_MODEL`, `CATCOT_GOOGLE_MODEL`, `CATCOT_OPENAI_MODEL`, `CATCOT_VOYAGE_MODEL`
+
+**Other env vars:** `OLLAMA_HOST` (default: `http://localhost:11434`) — custom Ollama server URL
+
+**Check active provider:** Use the `get_embedding_status` tool to see which provider, model, and dimensions are active.
+
+**Provider switching:** If you change providers on an already-indexed project, you must re-index (`reindex_project`) because embeddings from different providers are incompatible. Catcot will raise an error if it detects a mismatch.
 
 ### Step Indicator
 When using Catcot tools, mention "Catcot kullaniliyor" (Catcot is being used) in your response so the user knows semantic search is active.

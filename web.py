@@ -10,6 +10,7 @@ from pathlib import Path
 
 import chromadb
 
+from embedder import get_provider_info
 from savings import get_savings_summary
 
 CHROMA_DIR = os.path.expanduser("~/.code-rag-mcp/chroma_db")
@@ -53,6 +54,19 @@ class DashboardHandler(SimpleHTTPRequestHandler):
     def _api_status(self):
         status = {"mcp": True, "mcp_detail": "Catcot running on stdio"}
 
+        # Check embedding provider
+        try:
+            provider = get_provider_info()
+            status["embedding"] = True
+            status["embedding_provider"] = provider["name"]
+            status["embedding_model"] = provider["model"]
+            status["embedding_dimensions"] = provider["dimensions"]
+            status["embedding_detail"] = f"{provider['name']} — {provider['model']}"
+        except RuntimeError:
+            status["embedding"] = False
+            status["embedding_provider"] = None
+            status["embedding_detail"] = "No provider available"
+
         # Check ChromaDB
         try:
             client = chromadb.PersistentClient(path=CHROMA_DIR)
@@ -77,6 +91,8 @@ class DashboardHandler(SimpleHTTPRequestHandler):
                     "name": col.name,
                     "project_path": meta.get("project_path", "unknown"),
                     "chunks": col.count(),
+                    "embedding_provider": meta.get("embedding_provider", "ollama"),
+                    "embedding_model": meta.get("embedding_model", "unknown"),
                 })
             self._send_json(projects)
         except Exception as e:
