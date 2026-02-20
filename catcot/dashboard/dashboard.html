@@ -864,8 +864,8 @@ async function loadSavings(){
     // Render chart
     const chartEl=document.getElementById('chart-bars');
     chartEl.innerHTML='';
-    const trend=d.trend||[];
-    const maxVal=Math.max(...trend.map(t=>t.tokens_saved),1);
+    const trend=(d.trend||[]).filter(t=>t&&typeof t.tokens_saved==='number'&&t.date);
+    const maxVal=trend.length>0?Math.max(...trend.map(t=>t.tokens_saved),1):1;
 
     trend.forEach(t=>{
       const wrapper=document.createElement('div');
@@ -951,19 +951,20 @@ async function loadMemories() {
     const data = await r.json();
     const projects = data.projects || [];
     if (projects.length === 0) { renderMemoryEmpty(container); return; }
-    renderMemories(container, projects);
+    renderMemories(container, projects, data.stats || {});
   } catch(e) { renderMemoryEmpty(container); }
 }
 
-function renderMemories(container, projects) {
+function renderMemories(container, projects, stats) {
   container.innerHTML = '';
-  // Stats row
-  const totalMem = projects.reduce((s,p) => s + p.count, 0);
+  // Stats row — prefer server-computed stats, fallback to client-side
+  const totalMem = (stats && stats.total_memories) || projects.reduce((s,p) => s + p.count, 0);
+  const uniqueTags = (stats && stats.tags) ? stats.tags.length : getAllTags(projects).length;
   const statsHtml = `
     <div class="memory-stats reveal visible">
       <div class="memory-stat"><div class="memory-stat-value">${totalMem}</div><div class="memory-stat-label">Total Memories</div></div>
       <div class="memory-stat"><div class="memory-stat-value">${projects.length}</div><div class="memory-stat-label">Projects</div></div>
-      <div class="memory-stat"><div class="memory-stat-value">${getAllTags(projects).length}</div><div class="memory-stat-label">Unique Tags</div></div>
+      <div class="memory-stat"><div class="memory-stat-value">${uniqueTags}</div><div class="memory-stat-label">Unique Tags</div></div>
     </div>`;
   container.insertAdjacentHTML('beforeend', statsHtml);
 
@@ -1021,6 +1022,9 @@ const EMBED_COLORS = [
 ];
 let embedPoints = [];
 let embedMeta = [];
+let _embedMouseMove = null;
+let _embedMouseLeave = null;
+let _embedResize = null;
 
 async function loadEmbeddings() {
   try {
@@ -1126,9 +1130,14 @@ function renderEmbeddings(points) {
     });
   }
 
+  // Clean up old event listeners to prevent memory leaks
+  if (_embedMouseMove) canvas.removeEventListener('mousemove', _embedMouseMove);
+  if (_embedMouseLeave) canvas.removeEventListener('mouseleave', _embedMouseLeave);
+  if (_embedResize) window.removeEventListener('resize', _embedResize);
+
   // Hover tooltip
   if (tooltip) {
-    canvas.addEventListener('mousemove', (e) => {
+    _embedMouseMove = (e) => {
       const canvasRect = canvas.getBoundingClientRect();
       const mx = e.clientX - canvasRect.left;
       const my = e.clientY - canvasRect.top;
@@ -1140,10 +1149,11 @@ function renderEmbeddings(points) {
           `<strong>${escHtml(fname)}</strong><br>` +
           (hit.symbol_name ? `${escHtml(hit.symbol_name)}<br>` : '') +
           `<span style="color:var(--text-muted)">${escHtml(hit.language || '')}</span>`;
-        // Position tooltip avoiding edges
-        let tx = e.clientX - canvasRect.left + 12;
-        let ty = e.clientY - canvasRect.top - 12;
-        if (tx + 220 > logW) tx = mx - 220;
+        // Position tooltip — measure actual width to avoid edge overflow
+        const tipW = tooltip.offsetWidth || 220;
+        let tx = mx + 12;
+        let ty = my - 12;
+        if (tx + tipW > logW) tx = mx - tipW - 4;
         if (ty < 0) ty = my + 12;
         tooltip.style.left = tx + 'px';
         tooltip.style.top = ty + 'px';
@@ -1151,18 +1161,21 @@ function renderEmbeddings(points) {
       } else {
         tooltip.style.display = 'none';
       }
-    });
-    canvas.addEventListener('mouseleave', () => { tooltip.style.display = 'none'; });
+    };
+    _embedMouseLeave = () => { tooltip.style.display = 'none'; };
+    canvas.addEventListener('mousemove', _embedMouseMove);
+    canvas.addEventListener('mouseleave', _embedMouseLeave);
   }
 
   // Redraw on resize
-  window.addEventListener('resize', () => {
+  _embedResize = () => {
     const newRect = canvas.getBoundingClientRect();
     canvas.width = newRect.width * dpr;
     canvas.height = newRect.height * dpr;
     ctx.scale(dpr, dpr);
     draw();
-  });
+  };
+  window.addEventListener('resize', _embedResize);
 }
 
 loadEmbeddings();

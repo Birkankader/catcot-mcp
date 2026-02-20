@@ -1,6 +1,7 @@
 """Lightweight HTTP server for the Catcot dashboard."""
 
 import json
+import logging
 import os
 import threading
 import webbrowser
@@ -12,6 +13,8 @@ from catcot.config import CHROMA_DIR, MEMORY_DIR, get_chroma_client
 from catcot.core.embedder import get_provider_info
 from catcot.features.memory import list_memories, get_memory_stats
 from catcot.features.savings import get_savings_summary
+
+logger = logging.getLogger(__name__)
 DASHBOARD_PATH = Path(__file__).parent / "dashboard.html"
 DEFAULT_PORT = 9847
 
@@ -95,6 +98,7 @@ class DashboardHandler(SimpleHTTPRequestHandler):
                 })
             self._send_json(projects)
         except Exception as e:
+            logger.warning("Failed to load projects: %s", e)
             self._send_json([])
 
     def _api_savings(self):
@@ -154,8 +158,15 @@ class DashboardHandler(SimpleHTTPRequestHandler):
                 for emb, md in zip(embeddings, metadatas):
                     if not emb:
                         continue
-                    x = sum(emb[d] * proj[2 * d] for d in range(min(DIM, len(emb)))) * scale
-                    y = sum(emb[d] * proj[2 * d + 1] for d in range(min(DIM, len(emb)))) * scale
+                    emb_len = len(emb)
+                    if emb_len != DIM:
+                        logger.debug(
+                            "Embedding dimension mismatch: expected %d, got %d for %s",
+                            DIM, emb_len, md.get("file_path", "unknown"),
+                        )
+                    proj_dim = min(DIM, emb_len)
+                    x = sum(emb[d] * proj[2 * d] for d in range(proj_dim)) * scale
+                    y = sum(emb[d] * proj[2 * d + 1] for d in range(proj_dim)) * scale
                     points.append({
                         "x": round(x, 6),
                         "y": round(y, 6),
@@ -167,12 +178,13 @@ class DashboardHandler(SimpleHTTPRequestHandler):
 
             self._send_json(points)
         except Exception as e:
+            logger.warning("Failed to load embeddings: %s", e)
             self._send_json([])
 
     def _api_memories(self):
         """Return all memories grouped by project."""
         try:
-            result = {"projects": []}
+            result = {"projects": [], "stats": {}}
             if os.path.isdir(MEMORY_DIR):
                 for fname in os.listdir(MEMORY_DIR):
                     if not fname.endswith(".json"):
@@ -190,11 +202,19 @@ class DashboardHandler(SimpleHTTPRequestHandler):
                                 "memories": memories,
                                 "count": len(memories),
                             })
-                    except (json.JSONDecodeError, IOError):
+                    except (json.JSONDecodeError, OSError) as e:
+                        logger.debug("Skipping memory file %s: %s", fname, e)
                         continue
+
+            # Include memory stats
+            try:
+                result["stats"] = get_memory_stats()
+            except Exception:
+                pass
+
             self._send_json(result)
         except Exception:
-            self._send_json({"projects": []})
+            self._send_json({"projects": [], "stats": {}})
 
     def _send_json(self, data):
         body = json.dumps(data).encode("utf-8")
