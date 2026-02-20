@@ -9,7 +9,7 @@ import math
 import os
 from collections import defaultdict
 
-from config import collection_name, get_chroma_client
+from catcot.config import collection_name, get_chroma_client
 
 
 def _cosine_similarity(a: list[float], b: list[float]) -> float:

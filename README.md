@@ -42,13 +42,15 @@ git clone https://github.com/Birkankader/catcot-mcp.git
 cd catcot-mcp
 python -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
+pip install -e .                    # core dependencies
+pip install -e ".[treesitter]"      # + tree-sitter AST chunking
+pip install -e ".[all]"             # everything (tree-sitter + watchdog + fastembed)
 ```
 
 ### Register with Claude Code
 
 ```bash
-claude mcp add -s user catcot -- /path/to/catcot-mcp/.venv/bin/python /path/to/catcot-mcp/server.py
+claude mcp add -s user catcot -- /path/to/catcot-mcp/.venv/bin/python -m catcot
 ```
 
 ### Use
@@ -89,7 +91,7 @@ Claude will automatically use Catcot's tools.
 Run the server directly to launch the web dashboard:
 
 ```bash
-python server.py
+python -m catcot
 ```
 
 Opens at `http://localhost:9850` with:
@@ -121,21 +123,39 @@ Other file types fall back to a generic sliding-window chunker.
 ## Architecture
 
 ```
-server.py           → MCP server (FastMCP, stdio transport)
-config.py           → Centralized configuration & shared helpers
-searcher.py         → ChromaDB vector search
-indexer.py          → File scanning & chunk indexing
-embedder.py         → Multi-provider embedding client
-memory.py           → Persistent memory system (JSON + ChromaDB)
-savings.py          → Token savings tracker
-reviewer.py         → Multi-model code review
-git_tools.py        → Git integration (status, diff, log)
-topology.py         → Project component clustering
-context_expander.py → Chunk context expansion
-watcher.py          → Watchdog file watcher
-web.py              → Dashboard HTTP server
-dashboard.html      → Web dashboard UI
-chunkers/           → Code chunkers (tree-sitter + regex fallbacks)
+catcot/
+├── __init__.py              # Package init, version
+├── __main__.py              # `python -m catcot` entry point
+├── server.py                # MCP tool registrations (FastMCP)
+├── config.py                # Paths, ChromaDB helpers
+│
+├── core/                    # Core indexing & search
+│   ├── embedder.py          # Multi-provider embedding client
+│   ├── indexer.py           # File scanning & chunk indexing
+│   └── searcher.py          # ChromaDB vector search
+│
+├── chunkers/                # Code chunking (tree-sitter + regex)
+│   ├── base.py              # Base chunker & Chunk dataclass
+│   ├── treesitter_chunker.py
+│   ├── python_chunker.py
+│   ├── js_ts_chunker.py
+│   ├── java_chunker.py
+│   ├── kotlin_chunker.py
+│   ├── sql_chunker.py
+│   └── generic_chunker.py
+│
+├── features/                # Additional capabilities
+│   ├── memory.py            # Persistent memory (JSON + ChromaDB)
+│   ├── savings.py           # Token savings tracker
+│   ├── reviewer.py          # Multi-model code review
+│   ├── topology.py          # Project component clustering
+│   ├── context_expander.py  # Chunk context expansion
+│   ├── git_tools.py         # Git integration (status, diff, log)
+│   └── watcher.py           # Watchdog file watcher
+│
+└── dashboard/               # Web UI
+    ├── web.py               # Dashboard HTTP server
+    └── dashboard.html       # Web dashboard UI
 ```
 
 ## License

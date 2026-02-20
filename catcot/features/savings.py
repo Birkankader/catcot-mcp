@@ -6,7 +6,7 @@ import time
 from datetime import datetime, date
 from pathlib import Path
 
-from config import BASE_DIR, SAVINGS_FILE
+from catcot.config import BASE_DIR, SAVINGS_FILE
 
 # Token estimation: ~4 characters = 1 token
 CHARS_PER_TOKEN = 4

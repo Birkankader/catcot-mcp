@@ -8,10 +8,10 @@ from functools import partial
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from pathlib import Path
 
-from config import CHROMA_DIR, MEMORY_DIR, get_chroma_client
-from embedder import get_provider_info
-from memory import list_memories, get_memory_stats
-from savings import get_savings_summary
+from catcot.config import CHROMA_DIR, MEMORY_DIR, get_chroma_client
+from catcot.core.embedder import get_provider_info
+from catcot.features.memory import list_memories, get_memory_stats
+from catcot.features.savings import get_savings_summary
 DASHBOARD_PATH = Path(__file__).parent / "dashboard.html"
 DEFAULT_PORT = 9847
 

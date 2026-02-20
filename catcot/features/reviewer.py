@@ -8,7 +8,7 @@ from typing import Optional, Tuple
 
 import httpx
 
-from searcher import search_code
+from catcot.core.searcher import search_code
 
 
 class ReviewBackend(str, Enum):

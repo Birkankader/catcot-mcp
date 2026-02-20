@@ -1,0 +1,28 @@
+[project]
+name = "catcot"
+version = "2.1.0"
+description = "Semantic code search MCP server"
+requires-python = ">=3.10"
+dependencies = [
+    "mcp>=1.0.0",
+    "chromadb>=0.4.0",
+    "httpx>=0.25.0",
+]
+
+[project.optional-dependencies]
+treesitter = ["tree-sitter>=0.21.0", "tree-sitter-language-pack>=0.1.0"]
+watch = ["watchdog>=3.0.0"]
+local = ["fastembed"]
+all = [
+    "tree-sitter>=0.21.0",
+    "tree-sitter-language-pack>=0.1.0",
+    "watchdog>=3.0.0",
+    "fastembed",
+]
+
+[project.scripts]
+catcot = "catcot.server:main"
+
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"

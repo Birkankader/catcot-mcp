@@ -4,9 +4,9 @@ import hashlib
 import os
 from pathlib import Path
 
-from chunkers import Chunk, get_chunker
-from config import CHROMA_DIR, collection_name, get_chroma_client
-from embedder import embed_texts, get_provider_info
+from catcot.chunkers import Chunk, get_chunker
+from catcot.config import CHROMA_DIR, collection_name, get_chroma_client
+from catcot.core.embedder import embed_texts, get_provider_info
 
 # Default ignore patterns
 IGNORE_DIRS = {

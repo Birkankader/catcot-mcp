@@ -18,10 +18,10 @@ except ImportError:
     class FileSystemEventHandler:  # type: ignore
         pass
 
-from chunkers import get_chunker, Chunk
-from config import collection_name, get_chroma_client
-from embedder import embed_texts, get_provider_info
-from indexer import (
+from catcot.chunkers import get_chunker, Chunk
+from catcot.config import collection_name, get_chroma_client
+from catcot.core.embedder import embed_texts, get_provider_info
+from catcot.core.indexer import (
     IGNORE_DIRS,
     IGNORE_EXTENSIONS,
     _file_hash,

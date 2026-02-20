@@ -2,8 +2,8 @@
 
 import os
 
-from config import collection_name, get_chroma_client
-from embedder import embed_query, get_provider_info
+from catcot.config import collection_name, get_chroma_client
+from catcot.core.embedder import embed_query, get_provider_info
 
 
 async def search_code(

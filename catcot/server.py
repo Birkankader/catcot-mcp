@@ -11,27 +11,24 @@ import os
 import sys
 import time
 
-# Ensure local imports work
-sys.path.insert(0, os.path.dirname(__file__))
-
 from mcp.server import FastMCP
 
-from embedder import get_provider_info
-from indexer import index_project as do_index, list_indexed_projects as do_list
-from searcher import search_code as do_search
-from savings import record_search, get_savings_summary
-from reviewer import code_review as do_review
-from git_tools import (
+from catcot.core.embedder import get_provider_info
+from catcot.core.indexer import index_project as do_index, list_indexed_projects as do_list
+from catcot.core.searcher import search_code as do_search
+from catcot.features.savings import record_search, get_savings_summary
+from catcot.features.reviewer import code_review as do_review
+from catcot.features.git_tools import (
     get_modified_files as git_modified_files,
     get_diff as git_diff,
     get_recent_changes as git_recent_changes,
     get_file_diff as git_file_diff,
     is_git_repo,
 )
-from topology import generate_project_map as do_project_map
-from context_expander import get_chunk_context as do_get_context
-from watcher import start_watching, stop_watching, list_watched
-from memory import (
+from catcot.features.topology import generate_project_map as do_project_map
+from catcot.features.context_expander import get_chunk_context as do_get_context
+from catcot.features.watcher import start_watching, stop_watching, list_watched
+from catcot.features.memory import (
     store_memory as do_store_memory,
     recall_memory as do_recall_memory,
     list_memories as do_list_memories,
@@ -638,8 +635,9 @@ async def delete_project_memory(project_path: str, key: str) -> str:
     return f"[Catcot Memory] Memory not found: {key}"
 
 
-if __name__ == "__main__":
-    from web import start_dashboard
+def main():
+    """Entry point for running the Catcot MCP server."""
+    from catcot.dashboard.web import start_dashboard
     try:
         provider = get_provider_info()
         sys.stderr.write(
@@ -651,3 +649,7 @@ if __name__ == "__main__":
     port = start_dashboard(open_browser=True)
     sys.stderr.write(f"[Catcot] Dashboard running at http://localhost:{port}\n")
     mcp.run(transport="stdio")
+
+
+if __name__ == "__main__":
+    main()

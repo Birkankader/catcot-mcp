@@ -11,8 +11,8 @@ import time
 import uuid
 from pathlib import Path
 
-from config import MEMORY_DIR, get_chroma_client, memory_collection_name
-from embedder import embed_texts, embed_query
+from catcot.config import MEMORY_DIR, get_chroma_client, memory_collection_name
+from catcot.core.embedder import embed_texts, embed_query
 
 
 def _memory_file(project_path: str) -> str:
